@@ -16,7 +16,7 @@ export default class InfoCommand extends TextCommand {
   async run(ctx: CommandContext) {
     await replyOrSend(ctx, {
       content: stripIndents`
-        ${this.emojis.getMarkdown('craig')} **Craig** is a multi-track voice channel recorder.
+        ${this.emojis.getMarkdown('craig')} **Silhouette** is a multi-track voice channel recorder.
         This server is on shard ${this.client.shard?.id ?? process.env.SHARD_ID} with ${
         this.client.shard?.latency ?? '<unknown>'
       } milliseconds of latency.
@@ -28,7 +28,7 @@ export default class InfoCommand extends TextCommand {
             {
               type: ComponentType.BUTTON,
               style: ButtonStyle.LINK,
-              label: 'craig.chat',
+              label: 'Silhouette',
               url: this.client.config.craig.homepage
             },
             {

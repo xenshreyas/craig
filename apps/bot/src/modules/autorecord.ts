@@ -272,7 +272,7 @@ export default class AutorecordModule extends DexareModule<DexareClient<CraigBot
                       type: ComponentType.BUTTON,
                       style: ButtonStyle.LINK,
                       label: 'Support Server',
-                      url: 'https://discord.gg/craig'
+                      url: 'https://discord.gg/tKmzsdB7'
                     }
                   ]
                 }

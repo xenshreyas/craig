@@ -50,7 +50,7 @@ export default class Join extends GeneralCommand {
               type: ComponentType.BUTTON,
               style: ButtonStyle.LINK,
               label: 'Support Server',
-              url: 'https://discord.com/invite/PEc4QBE45f'
+              url: 'https://discord.gg/tKmzsdB7'
             }
           ]
         }
@@ -81,7 +81,7 @@ export default class Join extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'Join Support Server',
-                url: 'https://discord.gg/craig'
+                url: 'https://discord.gg/tKmzsdB7'
               }
             ]
           }
@@ -124,7 +124,7 @@ export default class Join extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'How do I fix this?',
-                url: 'https://craig.chat/docs/#setting-up-access-roles'
+                url: `${this.client.config.craig.homepage.replace(/\/$/, '')}/docs/#setting-up-access-roles`
               }
             ]
           }
@@ -240,7 +240,7 @@ export default class Join extends GeneralCommand {
                   type: ComponentType.BUTTON,
                   style: ButtonStyle.LINK,
                   label: 'Join Support Server',
-                  url: 'https://discord.gg/craig'
+                  url: 'https://discord.gg/tKmzsdB7'
                 }
               ]
             }
@@ -270,8 +270,8 @@ export default class Join extends GeneralCommand {
     if (parsedRewards.rewards.recordHours <= 0)
       return {
         content: stripIndentsAndLines`
-          Sorry, but this bot is only for patrons. Please use Craig.
-          If you have recently became a patron, login to the [dashboard](https://my.craig.chat/).
+          Sorry, but this bot is only for patrons. Please use Silhouette.
+          If you have recently became a patron, login to the [dashboard](${this.client.config.craig.dashboardURL}/).
           Your benefits may take up to an hour to become active.
         `,
         components: [
@@ -281,8 +281,8 @@ export default class Join extends GeneralCommand {
               {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
-                label: 'craig.chat',
-                url: 'https://craig.chat/'
+                label: 'Silhouette',
+                url: this.client.config.craig.homepage
               },
               {
                 type: ComponentType.BUTTON,

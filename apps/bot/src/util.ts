@@ -22,7 +22,7 @@ import { prisma } from './prisma';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const version = require('../package.json').version;
 
-export const userAgent = `CraigBot (https://craig.chat ${version}) Node.js/${process.version}`;
+export const userAgent = `SilhouetteBot (${version}) Node.js/${process.version}`;
 
 let lastBanUpdate = 0;
 let bans: Ban[] = [];

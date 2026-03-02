@@ -159,7 +159,7 @@ export default function Index(props: Props) {
 
       if (error === 'access_denied') content = 'You denied access to your account.';
       else if (error === 'invalid_scope')
-        content = 'You have provided partial permissions to Craig. Cloud backup will not work unless all permissions are checked.';
+        content = 'You have provided partial permissions to Silhouette. Cloud backup will not work unless all permissions are checked.';
       else content = error;
     }
 
@@ -257,7 +257,7 @@ export default function Index(props: Props) {
   return (
     <>
       <Head>
-        <title>Craig Dashboard</title>
+        <title>Silhouette Dashboard</title>
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <meta httpEquiv="Content-Type" content="text/html; charset=UTF-8" />
         <meta httpEquiv="Content-Language" content="en" />
@@ -265,8 +265,8 @@ export default function Index(props: Props) {
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2dd4bf" />
-        <meta name="og:site_name" content="Craig" />
-        <meta name="og:title" content="Craig Dashboard" />
+        <meta name="og:site_name" content="Silhouette" />
+        <meta name="og:title" content="Silhouette Dashboard" />
         <meta name="og:description" content="The multi-track recording bot for Discord." />
         <meta name="og:locale" content="en_US" />
         <meta name="og:image" content="/icon-512x512.png" />
@@ -331,7 +331,7 @@ export default function Index(props: Props) {
                       <b>the same Patreon account you are a patron with</b>.
                     </li>
                     <li>
-                      <i>Still</i> didn't get your benefits? Join the <Link href="https://craig.chat/support">support server</Link> for help.
+                      <i>Still</i> didn't get your benefits? Join the <Link href="https://discord.gg/tKmzsdB7">support server</Link> for help.
                     </li>
                   </ul>
                 </div>

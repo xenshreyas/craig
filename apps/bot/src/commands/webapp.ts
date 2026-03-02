@@ -8,19 +8,19 @@ export default class Webapp extends GeneralCommand {
   constructor(creator: SlashCreator) {
     super(creator, {
       name: 'webapp',
-      description: 'Enable/disable the Craig Webapp.',
+      description: 'Enable/disable the Silhouette web app.',
       deferEphemeral: true,
       guildIDs: mainBotCommandOnly,
       options: [
         {
           type: CommandOptionType.SUB_COMMAND,
           name: 'on',
-          description: 'Enable the Craig Webapp in future recordings.'
+          description: 'Enable the Silhouette web app in future recordings.'
         },
         {
           type: CommandOptionType.SUB_COMMAND,
           name: 'off',
-          description: 'Disable the Craig Webapp.'
+          description: 'Disable the Silhouette web app.'
         }
       ]
     });
@@ -31,7 +31,7 @@ export default class Webapp extends GeneralCommand {
   async run(ctx: CommandContext) {
     if (!this.recorder.client.config.craig.webapp.on)
       return {
-        content: 'This instance of Craig does not have a webapp.',
+        content: 'This instance of Silhouette does not have a web app.',
         ephemeral: true
       };
 
@@ -61,7 +61,7 @@ export default class Webapp extends GeneralCommand {
         });
 
         return {
-          content: 'Enabled the Craig Webapp in future recordings. You should get a Webapp link in your recording DM.',
+          content: 'Enabled the Silhouette web app in future recordings. You should get a web app link in your recording DM.',
           ephemeral: true
         };
       }
@@ -73,7 +73,7 @@ export default class Webapp extends GeneralCommand {
         });
 
         return {
-          content: 'Disabled the Craig Webapp.',
+          content: 'Disabled the Silhouette web app.',
           ephemeral: true
         };
       }

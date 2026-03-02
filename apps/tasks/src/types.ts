@@ -5,7 +5,7 @@ export class TaskJob {
   time: string;
   logger: Logger;
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  userAgent = `CraigTasks (https://craig.chat ${require('../package.json').version}) Node.js/${process.version}`;
+  userAgent = `SilhouetteTasks (${require('../package.json').version}) Node.js/${process.version}`;
 
   constructor(name: string, time: string) {
     this.name = name;

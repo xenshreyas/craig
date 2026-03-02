@@ -104,7 +104,7 @@ export default class ServerSettings extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'Join Support Server',
-                url: 'https://discord.gg/craig'
+                url: 'https://discord.gg/tKmzsdB7'
               }
             ]
           }
@@ -223,7 +223,7 @@ export default class ServerSettings extends GeneralCommand {
               return {
                 content: stripIndents`
                   Sorry, but this feature is only for Tier 1 supporters ($1 patrons).
-                  If you have recently became a supporter, login to the [dashboard](https://my.craig.chat/).
+                  If you have recently became a supporter, login to the [dashboard](${this.client.config.craig.dashboardURL}/).
                   Your benefits may take up to an hour to become active.
                 `,
                 components: [

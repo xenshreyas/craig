@@ -193,7 +193,7 @@ export default class Recording {
       );
       this.state = RecordingState.ERROR;
       this.stateDescription =
-        'Failed to connect to your channel, try again later. If the issue persists, report it in the [support server](<https://discord.gg/craig>).';
+        'Failed to connect to your channel, try again later. If the issue persists, report it in the [support server](<https://discord.gg/tKmzsdB7>).';
       await this.stop(true);
       await this.pushToActivity('Failed to connect!');
 

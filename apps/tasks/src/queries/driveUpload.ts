@@ -84,14 +84,14 @@ async function cook(id: string, format = 'flac', container = 'zip', dynaudnorm =
 async function findCraigDirectoryInGoogleDrive(drive: drive_v3.Drive) {
   try {
     const list = await drive.files.list({
-      q: "name = 'Craig' and mimeType = 'application/vnd.google-apps.folder'"
+      q: "name = 'Silhouette' and mimeType = 'application/vnd.google-apps.folder'"
     });
 
     if (list.data.files && list.data.files.length > 0) return list.data.files[0].id;
 
     const folder = await drive.files.create({
       requestBody: {
-        name: 'Craig',
+        name: 'Silhouette',
         mimeType: 'application/vnd.google-apps.folder',
         folderColorRgb: '#00aaaa'
       }
@@ -139,7 +139,7 @@ async function getRefreshedMicrosoftAccessToken(accessToken: string, refreshToke
 
 function getRecordingDescription(recordingId: string, info: any, joiner = '\n') {
   return [
-    `Craig recording ${recordingId} via https://craig.chat/`,
+    `Silhouette recording ${recordingId}`,
     '',
     `${info.autorecorded ? 'Auto-recorded in behalf of' : 'Started by'}: ${info.requester} (${info.requesterId})`,
     `Server: ${info.guild} (${info.guildExtra.id})`,
@@ -172,7 +172,7 @@ export async function driveUpload({
   if (!dataExists) return { error: 'data_deleted', notify: false };
   const info = JSON.parse(await fs.readFile(path.join(recPath, `${recordingId}.ogg.info`), 'utf8'));
   const startDate = new Date(info.startTime);
-  const fileName = `craig_${recordingId}_${startDate.getFullYear()}-${
+  const fileName = `silhouette_${recordingId}_${startDate.getFullYear()}-${
     startDate.getMonth() + 1
   }-${startDate.getDate()}_${startDate.getHours()}-${startDate.getMinutes()}-${startDate.getSeconds()}`;
 
@@ -249,7 +249,7 @@ export async function driveUpload({
               'craig-channel-id': info.channelExtra.id
             },
             contentHints: {
-              indexableText: `${info.channel} - ${info.guild} - Craig recording ${recordingId} - https://craig.chat/`
+              indexableText: `${info.channel} - ${info.guild} - Silhouette recording ${recordingId}`
             }
           },
           media: {
