@@ -33,7 +33,7 @@ export default class VoiceTestCommand extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'Join Support Server',
-                url: 'https://discord.gg/craig'
+                url: 'https://discord.gg/tKmzsdB7'
               }
             ]
           }
@@ -78,7 +78,7 @@ export default class VoiceTestCommand extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'How do I fix this?',
-                url: 'https://craig.chat/docs/#setting-up-access-roles'
+                url: `${this.client.config.craig.homepage.replace(/\/$/, '')}/docs/#setting-up-access-roles`
               }
             ]
           }

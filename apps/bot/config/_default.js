@@ -78,9 +78,9 @@ module.exports = {
       // The domain to get downloads from
       downloadDomain: 'localhost:5029',
       // The homepage of the bot
-      homepage: 'https://craig.chat/',
+      homepage: process.env.API_HOMEPAGE || 'http://localhost:5029/',
       // The dashboard URL
-      dashboardURL: 'https://my.craig.chat',
+      dashboardURL: process.env.APP_URI || 'http://localhost:3000',
       // Record disk size limit, in bytes
       sizeLimit: 536870912,
       // Record disk size limit for Opus web users, in bytes
@@ -98,7 +98,7 @@ module.exports = {
         on: true,
         url: 'ws://localhost:9001/shard',
         token: '1234',
-        // connectUrl: 'https://web.craig.chat?id={id}&key={key}',
+        // connectUrl: 'https://web.example.com?id={id}&key={key}',
         connectUrl: 'http://localhost:5000?id={id}&key={key}'
       },
       rewardTiers: {
@@ -148,7 +148,7 @@ module.exports = {
     status: {
       type: 4, // [custom status]
       name: 'craig',
-      state: 'Recording VCs • craig.chat'
+      state: 'Silhouette Meeting Notes'
     },
 
     logger: {
