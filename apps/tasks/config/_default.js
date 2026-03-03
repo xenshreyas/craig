@@ -65,6 +65,13 @@ module.exports = {
     maxDurationSec: process.env.TRANSCRIPT_MAX_DURATION_SEC ? Number(process.env.TRANSCRIPT_MAX_DURATION_SEC) : 7200,
     maxFileMb: process.env.TRANSCRIPT_MAX_FILE_MB ? Number(process.env.TRANSCRIPT_MAX_FILE_MB) : 24,
     previewChars: process.env.TRANSCRIPT_PREVIEW_CHARS ? Number(process.env.TRANSCRIPT_PREVIEW_CHARS) : 1200,
-    workerConcurrency: process.env.TRANSCRIPT_WORKER_CONCURRENCY ? Number(process.env.TRANSCRIPT_WORKER_CONCURRENCY) : 1
+    workerConcurrency: process.env.TRANSCRIPT_WORKER_CONCURRENCY ? Number(process.env.TRANSCRIPT_WORKER_CONCURRENCY) : 1,
+    chunking: {
+      enabled: process.env.TRANSCRIPT_CHUNK_ENABLED ? process.env.TRANSCRIPT_CHUNK_ENABLED === 'true' : true,
+      durationSec: process.env.TRANSCRIPT_CHUNK_DURATION_SEC ? Number(process.env.TRANSCRIPT_CHUNK_DURATION_SEC) : 600,
+      format: process.env.TRANSCRIPT_CHUNK_FORMAT || 'mp3',
+      bitrateKbps: process.env.TRANSCRIPT_CHUNK_BITRATE_KBPS ? Number(process.env.TRANSCRIPT_CHUNK_BITRATE_KBPS) : 32,
+      sampleRate: process.env.TRANSCRIPT_CHUNK_SAMPLE_RATE ? Number(process.env.TRANSCRIPT_CHUNK_SAMPLE_RATE) : 16000
+    }
   }
 };
