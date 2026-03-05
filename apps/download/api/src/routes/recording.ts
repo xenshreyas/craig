@@ -2,9 +2,19 @@ import { captureException, withScope } from '@sentry/node';
 import { RouteOptions } from 'fastify';
 
 import { onRequest } from '../influx';
+import { prisma } from '../prisma';
 import { ErrorCode, formatTime } from '../util';
 import { getNotes } from '../util/cook';
-import { deleteRecording, getRawRecordingStream, getRecording, getUsers, keyMatches } from '../util/recording';
+import {
+  deleteRecording,
+  getRawRecordingStream,
+  getRecording,
+  getRecordingAccess,
+  getUsers,
+  keyMatches,
+  recordingAccessKeyMatches,
+  recordingDeleteKeyMatches
+} from '../util/recording';
 
 export const headRoute: RouteOptions = {
   method: 'HEAD',
@@ -147,15 +157,15 @@ export const deleteRoute: RouteOptions = {
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
     if (!deleteKey) return reply.status(403).send({ ok: false, error: 'Invalid delete key', code: ErrorCode.INVALID_DELETE_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
-    onRequest(id);
-    if (String(info.delete) !== deleteKey)
+    const recording = await getRecordingAccess(id);
+    if (!recording) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (!recordingAccessKeyMatches(recording, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    if (!recordingDeleteKeyMatches(recording, deleteKey))
       return reply.status(403).send({ ok: false, error: 'Invalid delete key', code: ErrorCode.INVALID_DELETE_KEY });
+    onRequest(id);
 
     await deleteRecording(id);
+    await prisma.recording.delete({ where: { id } });
 
     return reply.status(204).send();
   }

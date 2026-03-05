@@ -3,7 +3,7 @@ import { RouteOptions } from 'fastify';
 
 import { prisma } from '../prisma';
 import { ErrorCode } from '../util';
-import { getRecording, keyMatches } from '../util/recording';
+import { getRecordingAccess, recordingAccessKeyMatches } from '../util/recording';
 
 export const statusRoute: RouteOptions = {
   method: 'GET',
@@ -14,10 +14,9 @@ export const statusRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const recording = await getRecordingAccess(id);
+    if (!recording) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (!recordingAccessKeyMatches(recording, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
     if (process.env.TRANSCRIPT_ENABLED === 'false')
       return reply.status(200).send({
         ok: true,
@@ -50,10 +49,9 @@ export const textRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const recording = await getRecordingAccess(id);
+    if (!recording) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (!recordingAccessKeyMatches(recording, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
     const transcript = await prisma.recordingTranscript.findUnique({ where: { recordingId: id } });
     if (!transcript) return reply.status(404).send({ ok: false, error: 'Transcript not found', code: ErrorCode.TRANSCRIPT_NOT_FOUND });

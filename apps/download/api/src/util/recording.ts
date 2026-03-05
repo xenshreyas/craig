@@ -2,6 +2,9 @@ import { createReadStream } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 
+import { Recording } from '@prisma/client';
+
+import { prisma } from '../prisma';
 import StreamConcat from './streamConcat';
 
 export const recPath = path.join(__dirname, '..', '..', '..', '..', 'rec');
@@ -55,6 +58,8 @@ export interface RecordingNote {
   note: string;
 }
 
+export type RecordingAccess = Pick<Recording, 'id' | 'accessKey' | 'deleteKey' | 'expiresAt' | 'guildId' | 'userId'>;
+
 export async function fileExists(file: string) {
   try {
     await fs.access(file);
@@ -95,14 +100,32 @@ export async function getRecording(id: string): Promise<RecordingInfo | false> {
   return info as RecordingInfo;
 }
 
+export async function getRecordingAccess(id: string): Promise<RecordingAccess | null> {
+  return prisma.recording.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      accessKey: true,
+      deleteKey: true,
+      expiresAt: true,
+      guildId: true,
+      userId: true
+    }
+  });
+}
+
 export async function deleteRecording(id: string): Promise<void> {
   const keyExists = await fileExists(path.join(recPath, `${id}.ogg.key`));
   const featsExists = await fileExists(path.join(recPath, `${id}.ogg.features`));
-  await Promise.all(
+  const unlinkResults = await Promise.allSettled(
     ['data', 'header1', 'header2', ...(keyExists ? ['key'] : []), ...(featsExists ? ['features'] : [])].map((ext) =>
       fs.unlink(path.join(recPath, `${id}.ogg.${ext}`))
     )
   );
+
+  for (const result of unlinkResults) {
+    if (result.status === 'rejected' && (result.reason as { code?: string })?.code !== 'ENOENT') throw result.reason;
+  }
 }
 
 export async function getUsers(id: string): Promise<RecordingUser[]> {
@@ -113,4 +136,12 @@ export async function getUsers(id: string): Promise<RecordingUser[]> {
 
 export function keyMatches(rec: RecordingInfo, key: string) {
   return key === String(rec.key);
+}
+
+export function recordingAccessKeyMatches(rec: RecordingAccess, key: string) {
+  return key === String(rec.accessKey);
+}
+
+export function recordingDeleteKeyMatches(rec: RecordingAccess, key: string) {
+  return key === String(rec.deleteKey);
 }
