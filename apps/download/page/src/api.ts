@@ -99,6 +99,17 @@ export interface TranscriptState {
   completedAt?: string;
 }
 
+export type SummaryStatus = 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'ERROR' | 'SKIPPED';
+
+export interface SummaryState {
+  status: SummaryStatus;
+  preview?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
 export async function getRecording(id: string, key: string | number): Promise<RecordingInfo> {
   const response = await fetch(`/api/recording/${id}?key=${key}`);
   if (response.status !== 200) throw response;
@@ -162,4 +173,10 @@ export async function getTranscriptState(id: string, key: string | number): Prom
   const response = await fetch(`/api/recording/${id}/transcript?key=${key}`);
   if (response.status !== 200) throw response;
   return response.json().then((data) => data.transcript);
+}
+
+export async function getSummaryState(id: string, key: string | number): Promise<SummaryState> {
+  const response = await fetch(`/api/recording/${id}/summary?key=${key}`);
+  if (response.status !== 200) throw response;
+  return response.json().then((data) => data.summary);
 }

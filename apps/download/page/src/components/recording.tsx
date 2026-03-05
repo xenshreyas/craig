@@ -8,7 +8,7 @@ import clsx from 'clsx';
 import { Fragment, h } from 'preact';
 import { useTranslation } from 'react-i18next';
 
-import { CookAvatarsPayload, ReadyState, RecordingNote, RecordingPageInfo, RecordingUser, TranscriptState } from '../api';
+import { CookAvatarsPayload, ReadyState, RecordingNote, RecordingPageInfo, RecordingUser, SummaryState, TranscriptState } from '../api';
 import prettyMs from '../prettyMs';
 import { getDownloadsSection, getOtherFormatsSection, SectionButton } from '../sections';
 import { asT, PlatformInfo } from '../util';
@@ -31,6 +31,7 @@ interface RecordingProps {
     platform: PlatformInfo;
     readyState: ReadyState | null;
     transcriptState: TranscriptState | null;
+    summaryState: SummaryState | null;
     downloading: boolean;
     showPreviousDownload: boolean;
     expiredAudioMessage: string | null;
@@ -50,6 +51,7 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
   const downloadsSection = getDownloadsSection(recording, state.platform);
   const othersSection = getOtherFormatsSection(recording, state.platform);
   const transcript = state.transcriptState;
+  const summary = state.summaryState;
 
   return (
     <Fragment>
@@ -165,6 +167,29 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
             Transcript unavailable.
             {transcript.errorMessage ? ` ${transcript.errorMessage}` : ''}
           </span>
+	        )}
+	      </Section>
+
+	      <Section title="Meeting Summary" icon={downloadIcon}>
+	        {!summary || summary.status === 'PENDING' || summary.status === 'PROCESSING' ? (
+	          <span class="text-zinc-300">Summary generation in progress...</span>
+	        ) : summary.status === 'COMPLETE' ? (
+	          <div class="flex flex-col gap-3 w-full">
+	            <div class="bg-zinc-800 rounded-lg p-3 text-zinc-200 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
+	              {summary.preview || 'Summary generated with no text.'}
+	            </div>
+	            <a
+	              href={`/api/recording/${state.recordingId}/summary.md?key=${recording.key}`}
+	              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 focus:bg-cyan-500/10 outline-none"
+	            >
+	              Download MD
+	            </a>
+	          </div>
+	        ) : (
+	          <span class="text-red-400">
+	            Summary unavailable.
+	            {summary.errorMessage ? ` ${summary.errorMessage}` : ''}
+	          </span>
 	        )}
 	      </Section>
 

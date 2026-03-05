@@ -26,7 +26,8 @@
     "prisma:generate": "prisma generate && yarn manypkg run bot prisma:generate && yarn manypkg run dashboard prisma:generate && yarn manypkg run tasks prisma:generate",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev",
-    "entitlement": "tsx scripts/manageEntitlements.ts"
+    "entitlement": "tsx scripts/manageEntitlements.ts",
+    "backfill:summaries": "tsx scripts/backfillRecordingSummaries.ts"
   },
   "repository": {
     "type": "git",

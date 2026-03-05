@@ -62,11 +62,20 @@ model Recording {
   errored      Boolean   @default(false)
   expiresAt    DateTime  @db.Timestamptz(6)
   transcript   RecordingTranscript?
+  summary      RecordingSummary?
 
   @@index([userId, createdAt(sort: Desc)])
 }
 
 enum TranscriptStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  ERROR
+  SKIPPED
+}
+
+enum SummaryStatus {
   PENDING
   PROCESSING
   COMPLETE
@@ -90,6 +99,24 @@ model RecordingTranscript {
   preview      String?
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
+
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+}
+
+model RecordingSummary {
+  recordingId  String        @id
+  status       SummaryStatus @default(PENDING)
+  provider     String        @default("openai")
+  model        String        @default("gpt-5-mini")
+  attempts     Int           @default(0)
+  startedAt    DateTime?     @db.Timestamptz(6)
+  completedAt  DateTime?     @db.Timestamptz(6)
+  errorCode    String?
+  errorMessage String?
+  markdown     String?
+  preview      String?
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
 
   recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
 }
