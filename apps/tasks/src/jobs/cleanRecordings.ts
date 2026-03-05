@@ -56,8 +56,16 @@ export default class CleanRecordings extends TaskJob {
             : s.mtime.getTime() + recordingConfig.fallbackExpiration < Date.now();
 
         if (shouldExpire) {
-          this.logger.log(`Deleting ${id}.`);
-          await Promise.all(types.map((type) => unlink(path.join(recPath, `${id}.ogg.${type}`))));
+          if (!types.includes('duration')) {
+            this.logger.warn(`Skipping audio expiry for ${id}; persisted duration is missing.`);
+            continue;
+          }
+
+          const audioTypes = types.filter((type) => ['data', 'header1', 'header2'].includes(type));
+          if (audioTypes.length === 0) continue;
+
+          this.logger.log(`Expiring audio for ${id}.`);
+          await Promise.all(audioTypes.map((type) => unlink(path.join(recPath, `${id}.ogg.${type}`)).catch(() => {})));
         }
       } catch (e) {
         this.logger.error(`Failed to read info file for ${id}.`, types);

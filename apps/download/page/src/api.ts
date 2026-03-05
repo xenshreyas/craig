@@ -39,6 +39,24 @@ export interface RecordingUser {
   avatar?: string;
 }
 
+export interface RecordingNote {
+  time: string;
+  note: string;
+}
+
+export interface RecordingPageInfo extends RecordingInfo {
+  audioAvailable: boolean;
+  audioExpired: boolean;
+  duration: number | null;
+}
+
+export interface RecordingPagePayload {
+  recording: RecordingPageInfo;
+  users: RecordingUser[];
+  notes?: RecordingNote[] | null;
+  expiredAudioMessage?: string | null;
+}
+
 export interface CookPayload {
   format?: string;
   container?: string;
@@ -91,6 +109,17 @@ export async function getRecordingUsers(id: string, key: string | number): Promi
   const response = await fetch(`/api/recording/${id}/users?key=${key}`);
   if (response.status !== 200) throw response;
   return response.json().then((data) => data.users);
+}
+
+export async function getRecordingPage(id: string, key: string | number): Promise<RecordingPagePayload> {
+  const response = await fetch(`/api/recording/${id}/page?key=${key}`);
+  if (response.status !== 200) throw response;
+  return response.json().then((data) => ({
+    recording: data.recording,
+    users: data.users,
+    notes: data.notes,
+    expiredAudioMessage: data.expiredAudioMessage
+  }));
 }
 
 export async function getRecordingDuration(id: string, key: string | number): Promise<number> {

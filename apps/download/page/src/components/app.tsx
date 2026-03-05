@@ -8,13 +8,13 @@ import { Translation } from 'react-i18next';
 import {
   CookAvatarsPayload,
   cookDownload,
-  getRecording,
+  getRecordingPage,
   getRecordingDuration,
   getTranscriptState,
-  getRecordingUsers,
   isReady,
   ReadyState,
-  RecordingInfo,
+  RecordingNote,
+  RecordingPageInfo,
   RecordingUser,
   TranscriptState
 } from '../api';
@@ -46,11 +46,13 @@ interface AppState {
   loading: boolean;
   platform: PlatformInfo;
   recordingId: string;
-  recording: RecordingInfo | null;
+  recording: RecordingPageInfo | null;
   users: RecordingUser[] | null;
+  notes: RecordingNote[] | null;
   durationLoading: boolean;
   duration: number | null;
   error: string | null;
+  expiredAudioMessage: string | null;
 
   downloading: boolean;
   readyState: ReadyState | null;
@@ -82,9 +84,11 @@ export default class App extends Component<any, AppState> {
       recordingId: location.pathname.split('/')[2],
       recording: null,
       users: null,
+      notes: null,
       durationLoading: false,
       duration: null,
       error: null,
+      expiredAudioMessage: null,
 
       downloading: false,
       readyState: null,
@@ -141,12 +145,20 @@ export default class App extends Component<any, AppState> {
       const query = new URLSearchParams(location.search);
       const key = query.get('key');
       if (!key) throw new Error('No key');
-      const recording = await getRecording(this.state.recordingId, key);
-      const users = await getRecordingUsers(this.state.recordingId, key);
-      const readyState = await isReady(this.state.recordingId, key);
+      const pageData = await getRecordingPage(this.state.recordingId, key);
       const transcriptState = await this.refreshTranscript(key).catch(() => null);
-      console.debug('Got recording', recording, users, readyState, transcriptState);
-      this.setState({ recording, users, loading: false, readyState, transcriptState });
+      const readyState = pageData.recording.audioAvailable ? await isReady(this.state.recordingId, key) : null;
+      console.debug('Got recording', pageData.recording, pageData.users, readyState, transcriptState);
+      this.setState({
+        recording: pageData.recording,
+        users: pageData.users,
+        notes: pageData.notes ?? null,
+        duration: pageData.recording.duration,
+        loading: false,
+        readyState,
+        transcriptState,
+        expiredAudioMessage: pageData.expiredAudioMessage ?? null
+      });
       if (readyState && !readyState.ready) await this.updatePreviousReadyState(key);
       if (transcriptState && !isTranscriptTerminal(transcriptState.status)) this.scheduleTranscriptRefresh(key);
     } catch (e) {
@@ -193,6 +205,7 @@ export default class App extends Component<any, AppState> {
 
   async loadDuration() {
     try {
+      if (this.state.recording && this.state.recording.audioExpired && this.state.duration === null) return;
       this.setState({ durationLoading: true });
       const duration = await getRecordingDuration(this.state.recordingId, this.state.recording.key);
       console.debug('Got duration', duration);
@@ -235,6 +248,7 @@ export default class App extends Component<any, AppState> {
   async startDownload(button: SectionButton, e: MouseEvent) {
     (e.target as HTMLButtonElement).blur();
     console.log('Downloading...', button);
+    if (this.state.recording?.audioExpired) return;
 
     const query = new URLSearchParams(location.search);
     if (button.format === 'raw') {
@@ -343,6 +357,7 @@ export default class App extends Component<any, AppState> {
   async startAvatarDownload(payload: CookAvatarsPayload, e: MouseEvent) {
     (e.target as HTMLButtonElement).blur();
     console.log('Downloading...', payload);
+    if (this.state.recording?.audioExpired) return;
 
     // Check ready state before cooking
     const query = new URLSearchParams(location.search);

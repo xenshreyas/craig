@@ -8,7 +8,7 @@ import clsx from 'clsx';
 import { Fragment, h } from 'preact';
 import { useTranslation } from 'react-i18next';
 
-import { CookAvatarsPayload, ReadyState, RecordingInfo, RecordingUser, TranscriptState } from '../api';
+import { CookAvatarsPayload, ReadyState, RecordingNote, RecordingPageInfo, RecordingUser, TranscriptState } from '../api';
 import prettyMs from '../prettyMs';
 import { getDownloadsSection, getOtherFormatsSection, SectionButton } from '../sections';
 import { asT, PlatformInfo } from '../util';
@@ -22,7 +22,8 @@ const EXPIRY_WARN_AT = 1000 * 60 * 60 * 3;
 
 interface RecordingProps {
   state: {
-    recording: RecordingInfo;
+    recording: RecordingPageInfo;
+    notes: RecordingNote[] | null;
     recordingId: string | number;
     users: RecordingUser[];
     durationLoading: boolean;
@@ -32,6 +33,7 @@ interface RecordingProps {
     transcriptState: TranscriptState | null;
     downloading: boolean;
     showPreviousDownload: boolean;
+    expiredAudioMessage: string | null;
   };
   onDurationClick?(e: MouseEvent): any;
   onDownloadClick?(button: SectionButton, e: MouseEvent): any;
@@ -88,6 +90,8 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
             <span class="text-zinc-100 font-display">{t('info.duration')}:</span>{' '}
             {state.durationLoading ? (
               <span class="font-medium text-zinc-400">{t('loading')}</span>
+            ) : recording.audioExpired && state.duration === null ? (
+              <span class="font-medium text-zinc-400">Unavailable</span>
             ) : state.duration === null ? (
               <button onClick={onDurationClick} class="font-medium text-zinc-400 hover:underline focus:underline outline-none">
                 {t('reveal')}
@@ -103,11 +107,19 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
             ))}
           </div>
         </div>
-      </div>
+	      </div>
 
-      {!state.downloading && state.readyState && state.showPreviousDownload && state.readyState.download ? (
-        <PreviouslyDownloaded readyState={state.readyState} users={state.users} recording={state.recording} platform={state.platform} />
-      ) : (
+	      {recording.audioExpired ? (
+	        <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-amber-200">
+	          {state.expiredAudioMessage || 'The audio for this recording has expired and is no longer available.'}
+	        </div>
+	      ) : (
+	        ''
+	      )}
+
+	      {!state.downloading && state.readyState && state.showPreviousDownload && state.readyState.download ? (
+	        <PreviouslyDownloaded readyState={state.readyState} users={state.users} recording={state.recording} platform={state.platform} />
+	      ) : (
         ''
       )}
 
@@ -132,10 +144,11 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
       </div>
 
       {/* Downloads */}
-      <Section title="Transcript" icon={downloadIcon}>
-        {!transcript || transcript.status === 'PENDING' || transcript.status === 'PROCESSING' ? (
-          <span class="text-zinc-300">Transcription in progress...</span>
-        ) : transcript.status === 'COMPLETE' ? (
+	      <Section title="Transcript" icon={downloadIcon}>
+	        {recording.audioExpired ? <span class="text-zinc-300">Audio expired, but the transcript remains available.</span> : ''}
+	        {!transcript || transcript.status === 'PENDING' || transcript.status === 'PROCESSING' ? (
+	          <span class="text-zinc-300">Transcription in progress...</span>
+	        ) : transcript.status === 'COMPLETE' ? (
           <div class="flex flex-col gap-3 w-full">
             <div class="bg-zinc-800 rounded-lg p-3 text-zinc-200 whitespace-pre-wrap break-words max-h-56 overflow-y-auto">
               {transcript.preview || 'Transcript generated with no text.'}
@@ -152,64 +165,91 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
             Transcript unavailable.
             {transcript.errorMessage ? ` ${transcript.errorMessage}` : ''}
           </span>
-        )}
-      </Section>
+	        )}
+	      </Section>
 
-      {/* Downloads */}
-      <Section title={t('sections.dl')} icon={downloadIcon}>
-        {downloadsSection.map((section, i) => (
-          <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
-            <div class="flex flex-row flex-wrap gap-3">
-              {section.buttons.map((button, ii) =>
-                button.hidden ? (
-                  ''
-                ) : (
-                  <DownloadButton
-                    icon={button.icon}
-                    title={asT(t, button.text)}
-                    suffix={asT(t, button.suffix)}
-                    ennuizel={button.ennuizel !== undefined}
-                    key={ii}
-                    onClick={(e) => onDownloadClick(button, e)}
-                  />
-                )
-              )}
-            </div>
-          </Section>
-        ))}
-      </Section>
+	      {state.notes && state.notes.length > 0 ? (
+	        <Section title="Notes" icon={downloadIcon}>
+	          <div class="flex flex-col gap-2 w-full">
+	            {state.notes.map((note, index) => (
+	              <div key={index} class="bg-zinc-800 rounded-lg p-3 text-zinc-200">
+	                <div class="text-xs uppercase tracking-wide text-zinc-400">{prettyMs(Number(note.time) * 1000)}</div>
+	                <div>{note.note}</div>
+	              </div>
+	            ))}
+	          </div>
+	        </Section>
+	      ) : (
+	        ''
+	      )}
 
-      {/* Avatars */}
-      <Section title={t('sections.avatars')} icon={avatarsIcon} collapsable collapsed>
-        <div class="flex flex-row flex-wrap gap-3">
-          <DownloadButton icon={imageIcon} onClick={(e) => onAvatarsClick({}, e)} title="PNG" />
-        </div>
-        {recording.features.glowers ? <GlowersSection platform={state.platform} users={state.users} onDownload={onAvatarsClick} /> : ''}
-      </Section>
+	      {/* Downloads */}
+	      {!recording.audioExpired ? (
+	        <Section title={t('sections.dl')} icon={downloadIcon}>
+	          {downloadsSection.map((section, i) => (
+	            <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
+	              <div class="flex flex-row flex-wrap gap-3">
+	                {section.buttons.map((button, ii) =>
+	                  button.hidden ? (
+	                    ''
+	                  ) : (
+	                    <DownloadButton
+	                      icon={button.icon}
+	                      title={asT(t, button.text)}
+	                      suffix={asT(t, button.suffix)}
+	                      ennuizel={button.ennuizel !== undefined}
+	                      key={ii}
+	                      onClick={(e) => onDownloadClick(button, e)}
+	                    />
+	                  )
+	                )}
+	              </div>
+	            </Section>
+	          ))}
+	        </Section>
+	      ) : (
+	        ''
+	      )}
 
-      {/* Other Formats */}
-      <Section title={t('sections.other_formats')} icon={audioIcon} collapsable collapsed>
-        {othersSection.map((section, i) => (
-          <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
-            <div class="flex flex-row flex-wrap gap-3">
-              {section.buttons.map((button, ii) =>
-                button.hidden ? (
-                  ''
-                ) : (
-                  <DownloadButton
-                    icon={button.icon}
-                    title={asT(t, button.text)}
-                    suffix={asT(t, button.suffix)}
-                    ennuizel={button.ennuizel !== undefined}
-                    key={ii}
-                    onClick={(e) => onDownloadClick(button, e)}
-                  />
-                )
-              )}
-            </div>
-          </Section>
-        ))}
-      </Section>
-    </Fragment>
-  );
-}
+	      {/* Avatars */}
+	      {!recording.audioExpired ? (
+	        <Section title={t('sections.avatars')} icon={avatarsIcon} collapsable collapsed>
+	          <div class="flex flex-row flex-wrap gap-3">
+	            <DownloadButton icon={imageIcon} onClick={(e) => onAvatarsClick({}, e)} title="PNG" />
+	          </div>
+	          {recording.features.glowers ? <GlowersSection platform={state.platform} users={state.users} onDownload={onAvatarsClick} /> : ''}
+	        </Section>
+	      ) : (
+	        ''
+	      )}
+
+	      {/* Other Formats */}
+	      {!recording.audioExpired ? (
+	        <Section title={t('sections.other_formats')} icon={audioIcon} collapsable collapsed>
+	          {othersSection.map((section, i) => (
+	            <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
+	              <div class="flex flex-row flex-wrap gap-3">
+	                {section.buttons.map((button, ii) =>
+	                  button.hidden ? (
+	                    ''
+	                  ) : (
+	                    <DownloadButton
+	                      icon={button.icon}
+	                      title={asT(t, button.text)}
+	                      suffix={asT(t, button.suffix)}
+	                      ennuizel={button.ennuizel !== undefined}
+	                      key={ii}
+	                      onClick={(e) => onDownloadClick(button, e)}
+	                    />
+	                  )
+	                )}
+	              </div>
+	            </Section>
+	          ))}
+	        </Section>
+	      ) : (
+	        ''
+	      )}
+	    </Fragment>
+	  );
+	}

@@ -98,6 +98,7 @@ export async function start(): Promise<void> {
   server.route(ennuizelWebsocketRoute);
   server.route(recordingRoute.headRoute);
   server.route(recordingRoute.getRoute);
+  server.route(recordingRoute.pageRoute);
   server.route(recordingRoute.deleteRoute);
   server.route(recordingRoute.textRoute);
   server.route(recordingRoute.usersRoute);
