@@ -73,5 +73,16 @@ module.exports = {
       bitrateKbps: process.env.TRANSCRIPT_CHUNK_BITRATE_KBPS ? Number(process.env.TRANSCRIPT_CHUNK_BITRATE_KBPS) : 32,
       sampleRate: process.env.TRANSCRIPT_CHUNK_SAMPLE_RATE ? Number(process.env.TRANSCRIPT_CHUNK_SAMPLE_RATE) : 16000
     }
+  },
+
+  summary: {
+    enabled: process.env.SUMMARY_ENABLED ? process.env.SUMMARY_ENABLED === 'true' : true,
+    queueKey: 'summary:queue',
+    lockTtlS: 14400,
+    popTimeoutS: 5,
+    model: process.env.OPENAI_SUMMARY_MODEL || 'gpt-5-mini',
+    previewChars: process.env.SUMMARY_PREVIEW_CHARS ? Number(process.env.SUMMARY_PREVIEW_CHARS) : 1200,
+    workerConcurrency: process.env.SUMMARY_WORKER_CONCURRENCY ? Number(process.env.SUMMARY_WORKER_CONCURRENCY) : 1,
+    maxTranscriptChars: process.env.SUMMARY_MAX_TRANSCRIPT_CHARS ? Number(process.env.SUMMARY_MAX_TRANSCRIPT_CHARS) : 120000
   }
 };

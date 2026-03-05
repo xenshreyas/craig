@@ -10,12 +10,14 @@ import {
   cookDownload,
   getRecordingPage,
   getRecordingDuration,
+  getSummaryState,
   getTranscriptState,
   isReady,
   ReadyState,
   RecordingNote,
   RecordingPageInfo,
   RecordingUser,
+  SummaryState,
   TranscriptState
 } from '../api';
 import i18n, { languages } from '../i18n';
@@ -42,6 +44,10 @@ function isTranscriptTerminal(status: string) {
   return status === 'COMPLETE' || status === 'ERROR' || status === 'SKIPPED';
 }
 
+function isSummaryTerminal(status: string) {
+  return status === 'COMPLETE' || status === 'ERROR' || status === 'SKIPPED';
+}
+
 interface AppState {
   loading: boolean;
   platform: PlatformInfo;
@@ -57,6 +63,7 @@ interface AppState {
   downloading: boolean;
   readyState: ReadyState | null;
   transcriptState: TranscriptState | null;
+  summaryState: SummaryState | null;
   downloadingAvatars: boolean;
   dlButton: SectionButton | null;
   showPreviousDownload: boolean;
@@ -93,6 +100,7 @@ export default class App extends Component<any, AppState> {
       downloading: false,
       readyState: null,
       transcriptState: null,
+      summaryState: null,
       downloadingAvatars: false,
       dlButton: null,
       showPreviousDownload: true
@@ -109,6 +117,7 @@ export default class App extends Component<any, AppState> {
     this.waitTillReady = this.waitTillReady.bind(this);
     this.startAvatarDownload = this.startAvatarDownload.bind(this);
     this.refreshTranscript = this.refreshTranscript.bind(this);
+    this.refreshSummary = this.refreshSummary.bind(this);
     this.showDeletePrompt = this.showDeletePrompt.bind(this);
     this.toggleHiddenPlatform = this.toggleHiddenPlatform.bind(this);
 
@@ -146,9 +155,9 @@ export default class App extends Component<any, AppState> {
       const key = query.get('key');
       if (!key) throw new Error('No key');
       const pageData = await getRecordingPage(this.state.recordingId, key);
-      const transcriptState = await this.refreshTranscript(key).catch(() => null);
+      const [transcriptState, summaryState] = await Promise.all([this.refreshTranscript(key).catch(() => null), this.refreshSummary(key).catch(() => null)]);
       const readyState = pageData.recording.audioAvailable ? await isReady(this.state.recordingId, key) : null;
-      console.debug('Got recording', pageData.recording, pageData.users, readyState, transcriptState);
+      console.debug('Got recording', pageData.recording, pageData.users, readyState, transcriptState, summaryState);
       this.setState({
         recording: pageData.recording,
         users: pageData.users,
@@ -157,10 +166,15 @@ export default class App extends Component<any, AppState> {
         loading: false,
         readyState,
         transcriptState,
+        summaryState,
         expiredAudioMessage: pageData.expiredAudioMessage ?? null
       });
       if (readyState && !readyState.ready) await this.updatePreviousReadyState(key);
-      if (transcriptState && !isTranscriptTerminal(transcriptState.status)) this.scheduleTranscriptRefresh(key);
+      if (
+        (transcriptState && !isTranscriptTerminal(transcriptState.status)) ||
+        (summaryState && !isSummaryTerminal(summaryState.status))
+      )
+        this.scheduleStatusRefresh(key);
     } catch (e) {
       const { errorT } = await parseError(e);
       console.error('Failed to get recording:', e);
@@ -174,15 +188,21 @@ export default class App extends Component<any, AppState> {
     return transcriptState;
   }
 
-  scheduleTranscriptRefresh(key: string) {
+  async refreshSummary(key: string) {
+    const summaryState = await getSummaryState(this.state.recordingId, key);
+    this.setState({ summaryState });
+    return summaryState;
+  }
+
+  scheduleStatusRefresh(key: string) {
     if (this.transcriptPoll) clearTimeout(this.transcriptPoll);
     this.transcriptPoll = setTimeout(async () => {
       try {
-        const transcriptState = await this.refreshTranscript(key);
-        if (!isTranscriptTerminal(transcriptState.status)) this.scheduleTranscriptRefresh(key);
+        const [transcriptState, summaryState] = await Promise.all([this.refreshTranscript(key), this.refreshSummary(key)]);
+        if (!isTranscriptTerminal(transcriptState.status) || !isSummaryTerminal(summaryState.status)) this.scheduleStatusRefresh(key);
       } catch (err) {
-        console.error('Failed to refresh transcript status:', err);
-        this.scheduleTranscriptRefresh(key);
+        console.error('Failed to refresh transcript/summary status:', err);
+        this.scheduleStatusRefresh(key);
       }
     }, 3000);
   }

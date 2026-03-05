@@ -11,6 +11,7 @@ import { pipeline } from 'node:stream/promises';
 import { createLogger } from '../logger';
 import { prisma } from '../prisma';
 import { client as redisClient } from '../redis';
+import { enqueueSummary } from '../summary/worker';
 import { OpenAIWhisperProvider } from './openaiWhisperProvider';
 import { TranscriptionProvider } from './provider';
 
@@ -222,6 +223,9 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
         errorCode: null,
         errorMessage: null
       }
+    });
+    await enqueueSummary(recordingId).catch((err) => {
+      logger.error('Failed to enqueue summary for %s', recordingId, err);
     });
     logger.info('Transcript complete for %s in %dms', recordingId, Date.now() - start);
   } catch (err) {
