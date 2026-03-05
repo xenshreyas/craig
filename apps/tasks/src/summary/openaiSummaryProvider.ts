@@ -32,7 +32,11 @@ export class OpenAISummaryProvider {
 
     const json = await response.json();
     const text = json?.output_text;
-    if (!text || typeof text !== 'string') throw new Error('summary_invalid_response:Missing output_text');
+    if (!text || typeof text !== 'string') {
+      console.error('Summary response keys:', Object.keys(json || {}));
+      console.error('Summary response output preview:', JSON.stringify(json?.output ?? null).slice(0, 4000));
+      throw new Error('summary_invalid_response:Missing output_text');
+    }
     return text.trim();
   }
 }
