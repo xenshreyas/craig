@@ -31,7 +31,11 @@ export class OpenAISummaryProvider {
     }
 
     const json = await response.json();
-    const text = json?.output_text;
+    const text =
+      json?.output_text ??
+      json?.output
+        ?.find((item: any) => item.type === 'message')
+        ?.content?.find((c: any) => c.type === 'output_text')?.text;
     if (!text || typeof text !== 'string') {
       console.error('Summary response keys:', Object.keys(json || {}));
       console.error('Summary response output preview:', JSON.stringify(json?.output ?? null).slice(0, 4000));
