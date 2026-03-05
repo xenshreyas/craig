@@ -4,14 +4,16 @@ import { RouteOptions } from 'fastify';
 import { onRequest } from '../influx';
 import { prisma } from '../prisma';
 import { ErrorCode, formatTime } from '../util';
-import { getNotes } from '../util/cook';
 import {
-  deleteRecording,
+  deleteRecordingArtifacts,
+  getRecordingPageInfo,
   getRawRecordingStream,
   getRecording,
   getRecordingAccess,
+  getRecordingUsersDurable,
   getUsers,
   keyMatches,
+  readPersistedNotes,
   recordingAccessKeyMatches,
   recordingDeleteKeyMatches
 } from '../util/recording';
@@ -58,15 +60,17 @@ export const textRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const recording = await getRecordingAccess(id);
+    if (!recording) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (!recordingAccessKeyMatches(recording, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
     onRequest(id);
 
     try {
-      const users = await getUsers(id);
-      const notes = await getNotes(id);
+      const info = await getRecordingPageInfo(id);
+      if (!info) return reply.status(404).send({ ok: false, error: 'Recording metadata not found', code: ErrorCode.RECORDING_NOT_FOUND });
+      info.key = recording.accessKey;
+      const users = (await getRecordingUsersDurable(id)) ?? [];
+      const notes = (await readPersistedNotes(id)) ?? [];
 
       return reply
         .status(200)
@@ -99,6 +103,37 @@ export const textRoute: RouteOptions = {
       });
       return reply.status(500).send({ ok: false, error: err.message });
     }
+  }
+};
+
+export const pageRoute: RouteOptions = {
+  method: 'GET',
+  url: '/api/recording/:id/page',
+  handler: async (request, reply) => {
+    const { id } = request.params as Record<string, string>;
+    if (!id) return reply.status(400).send({ ok: false, error: 'Invalid ID', code: ErrorCode.INVALID_ID });
+    const { key } = request.query as Record<string, string>;
+    if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+
+    const recording = await getRecordingAccess(id);
+    if (!recording) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (!recordingAccessKeyMatches(recording, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+
+    const info = await getRecordingPageInfo(id);
+    if (!info) return reply.status(404).send({ ok: false, error: 'Recording metadata not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    info.key = recording.accessKey;
+
+    const users = (await getRecordingUsersDurable(id)) ?? [];
+    const notes = await readPersistedNotes(id);
+    onRequest(id);
+
+    return reply.status(200).send({
+      ok: true,
+      recording: info,
+      users,
+      notes,
+      expiredAudioMessage: info.audioExpired ? 'The audio for this recording has expired and is no longer available.' : null
+    });
   }
 };
 
@@ -164,7 +199,7 @@ export const deleteRoute: RouteOptions = {
       return reply.status(403).send({ ok: false, error: 'Invalid delete key', code: ErrorCode.INVALID_DELETE_KEY });
     onRequest(id);
 
-    await deleteRecording(id);
+    await deleteRecordingArtifacts(id);
     await prisma.recording.delete({ where: { id } });
 
     return reply.status(204).send();

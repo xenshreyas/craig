@@ -16,7 +16,27 @@ import {
   rawPartwise
 } from '../util/cook';
 import { removeFile, writeToFile } from '../util/download';
-import { getRecording, getUsers, keyMatches } from '../util/recording';
+import {
+  getRecordingAccess,
+  getRecordingPageInfo,
+  getUsers,
+  readPersistedDuration,
+  readPersistedNotes,
+  recordingAccessKeyMatches,
+  writePersistedDuration,
+  writePersistedNotes
+} from '../util/recording';
+
+async function getAuthorizedPageInfo(id: string, key: string) {
+  const recording = await getRecordingAccess(id);
+  if (!recording) return { error: 'not_found' as const, recording: null, info: null };
+  if (!recordingAccessKeyMatches(recording, key)) return { error: 'invalid_key' as const, recording: null, info: null };
+
+  const info = await getRecordingPageInfo(id);
+  if (!info) return { error: 'not_found' as const, recording: null, info: null };
+
+  return { error: null, recording, info };
+}
 
 export const durationRoute: RouteOptions = {
   method: 'GET',
@@ -27,14 +47,23 @@ export const durationRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const pageData = await getAuthorizedPageInfo(id, key);
+    if (pageData.error === 'not_found') return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (pageData.error === 'invalid_key') return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
     onRequest(id);
 
     try {
+      const persistedDuration = await readPersistedDuration(id);
+      if (persistedDuration !== null) return reply.status(200).send({ ok: true, duration: persistedDuration });
+      if (!pageData.info.audioAvailable)
+        return reply.status(409).send({
+          ok: false,
+          error: 'Recording audio has expired and duration is unavailable.',
+          code: ErrorCode.RECORDING_AUDIO_EXPIRED
+        });
+
       const duration = await getDuration(id);
+      await writePersistedDuration(id, duration).catch(() => {});
       return reply.status(200).send({ ok: true, duration });
     } catch (err) {
       withScope((scope) => {
@@ -55,14 +84,23 @@ export const notesRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const pageData = await getAuthorizedPageInfo(id, key);
+    if (pageData.error === 'not_found') return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (pageData.error === 'invalid_key') return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
     onRequest(id);
 
     try {
+      const persistedNotes = await readPersistedNotes(id);
+      if (persistedNotes) return reply.status(200).send({ ok: true, notes: persistedNotes });
+      if (!pageData.info.audioAvailable)
+        return reply.status(409).send({
+          ok: false,
+          error: 'Recording audio has expired and notes are unavailable.',
+          code: ErrorCode.RECORDING_AUDIO_EXPIRED
+        });
+
       const notes = await getNotes(id);
+      await writePersistedNotes(id, notes).catch(() => {});
       return reply.status(200).send({ ok: true, notes });
     } catch (err) {
       withScope((scope) => {
@@ -83,12 +121,12 @@ export const ennuizelRoute: RouteOptions = {
     const { key, track } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
     if (!track) return reply.status(400).send({ ok: false, error: 'Invalid track', code: ErrorCode.INVALID_TRACK });
+    const pageData = await getAuthorizedPageInfo(id, key);
+    if (pageData.error === 'not_found') return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (pageData.error === 'invalid_key') return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    if (!pageData.info.audioAvailable)
+      return reply.status(410).send({ ok: false, error: 'Recording audio has expired.', code: ErrorCode.RECORDING_AUDIO_EXPIRED });
     onRequest(id);
-
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
     const trackNum = parseInt(track, 10);
     if (isNaN(trackNum) || trackNum <= 0) return reply.status(400).send({ ok: false, error: 'Invalid track', code: ErrorCode.INVALID_TRACK });
@@ -125,10 +163,11 @@ export const getRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const pageData = await getAuthorizedPageInfo(id, key);
+    if (pageData.error === 'not_found') return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (pageData.error === 'invalid_key') return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    if (!pageData.info.audioAvailable)
+      return reply.status(410).send({ ok: false, error: 'Recording audio has expired.', code: ErrorCode.RECORDING_AUDIO_EXPIRED });
     onRequest(id, true);
 
     try {
@@ -154,10 +193,11 @@ export const postRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const pageData = await getAuthorizedPageInfo(id, key);
+    if (pageData.error === 'not_found') return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (pageData.error === 'invalid_key') return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    if (!pageData.info.audioAvailable)
+      return reply.status(410).send({ ok: false, error: 'Recording audio has expired.', code: ErrorCode.RECORDING_AUDIO_EXPIRED });
     onRequest(id);
 
     const ready = await getReady(id);
@@ -167,13 +207,13 @@ export const postRoute: RouteOptions = {
     const body = request.body as { format?: string; container?: string; dynaudnorm?: boolean };
     if (body.format && !allowedFormats.includes(body.format))
       return reply.status(400).send({ ok: false, error: 'Invalid format', code: ErrorCode.INVALID_FORMAT });
-    if (body.format === 'mp3' && !info.features.mp3)
+    if (body.format === 'mp3' && !pageData.info.features.mp3)
       return reply.status(403).send({ ok: false, error: 'This recording is missing the MP3 feature', code: ErrorCode.MISSING_MP3 });
     const format = body.format || 'flac';
 
     if (body.container && !Object.keys(allowedContainers).includes(body.container))
       return reply.status(400).send({ ok: false, error: 'Invalid container', code: ErrorCode.INVALID_CONTAINER });
-    if (body.container === 'mix' && !info.features.mix)
+    if (body.container === 'mix' && !pageData.info.features.mix)
       return reply.status(403).send({ ok: false, error: 'This recording is missing the mix feature', code: ErrorCode.MISSING_MIX });
     const container = body.container || 'zip';
 
@@ -214,10 +254,11 @@ export const avatarRoute: RouteOptions = {
     const { key } = request.query as Record<string, string>;
     if (!key) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
 
-    const info = await getRecording(id);
-    if (info === false) return reply.status(410).send({ ok: false, error: 'Recording was deleted', code: ErrorCode.RECORDING_DELETED });
-    else if (!info) return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
-    if (!keyMatches(info, key)) return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    const pageData = await getAuthorizedPageInfo(id, key);
+    if (pageData.error === 'not_found') return reply.status(404).send({ ok: false, error: 'Recording not found', code: ErrorCode.RECORDING_NOT_FOUND });
+    if (pageData.error === 'invalid_key') return reply.status(403).send({ ok: false, error: 'Invalid key', code: ErrorCode.INVALID_KEY });
+    if (!pageData.info.audioAvailable)
+      return reply.status(410).send({ ok: false, error: 'Recording audio has expired.', code: ErrorCode.RECORDING_AUDIO_EXPIRED });
     onRequest(id);
 
     const ready = await getReady(id);
@@ -231,7 +272,7 @@ export const avatarRoute: RouteOptions = {
       fg?: string;
     };
 
-    if (((body.format && body.format !== 'png') || body.container === 'exe') && !info.features.glowers)
+    if (((body.format && body.format !== 'png') || body.container === 'exe') && !pageData.info.features.glowers)
       return reply.status(403).send({ ok: false, error: 'This recording is missing the glowers feature', code: ErrorCode.MISSING_GLOWERS });
     if (body.format && !allowedAvatarFormats.includes(body.format))
       return reply.status(400).send({ ok: false, error: 'Invalid format', code: ErrorCode.INVALID_FORMAT });

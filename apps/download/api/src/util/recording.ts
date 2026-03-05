@@ -59,6 +59,18 @@ export interface RecordingNote {
 }
 
 export type RecordingAccess = Pick<Recording, 'id' | 'accessKey' | 'deleteKey' | 'expiresAt' | 'guildId' | 'userId'>;
+export interface DurableRecordingPageInfo extends RecordingInfo {
+  audioAvailable: boolean;
+  audioExpired: boolean;
+  duration: number | null;
+}
+
+const audioTypes = ['data', 'header1', 'header2'] as const;
+const deletableMetadataTypes = ['info', 'users', 'features', 'key', 'duration', 'notes'] as const;
+
+function recordingFilePath(id: string, type: string) {
+  return path.join(recPath, `${id}.ogg.${type}`);
+}
 
 export async function fileExists(file: string) {
   try {
@@ -70,30 +82,38 @@ export async function fileExists(file: string) {
 }
 
 export function getRawRecordingStream(id: string) {
-  const stream = new StreamConcat(['header1', 'header2', 'data'].map((ext) => createReadStream(path.join(recPath, `${id}.ogg.${ext}`))));
+  const stream = new StreamConcat(audioTypes.map((ext) => createReadStream(recordingFilePath(id, ext))));
   return stream;
 }
 
 export async function getRecording(id: string): Promise<RecordingInfo | false> {
-  const dataExists = !(await Promise.all(['data', 'header1', 'header2'].map((ext) => fileExists(path.join(recPath, `${id}.ogg.${ext}`))))).some(
-    (exists) => exists === false
-  );
-  const infoExists = await fileExists(path.join(recPath, `${id}.ogg.info`));
+  const dataExists = !(await Promise.all(audioTypes.map((ext) => fileExists(recordingFilePath(id, ext))))).some((exists) => exists === false);
+  const infoExists = await fileExists(recordingFilePath(id, 'info'));
   if (!dataExists && infoExists) return false;
   if (!dataExists || !infoExists) return null;
 
-  const info: Partial<RecordingInfo> = JSON.parse(await fs.readFile(path.join(recPath, `${id}.ogg.info`), 'utf8'));
+  const info = await readRecordingInfo(id);
+  if (!info) return null;
+
+  return info;
+}
+
+async function readRecordingInfo(id: string): Promise<RecordingInfo | null> {
+  const infoExists = await fileExists(recordingFilePath(id, 'info'));
+  if (!infoExists) return null;
+
+  const info: Partial<RecordingInfo> = JSON.parse(await fs.readFile(recordingFilePath(id, 'info'), 'utf8'));
 
   // check for a key file
   if (!info.key) {
-    const keyExists = await fileExists(path.join(recPath, `${id}.ogg.key`));
-    if (keyExists) info.key = await fs.readFile(path.join(recPath, `${id}.ogg.key`), 'utf8');
+    const keyExists = await fileExists(recordingFilePath(id, 'key'));
+    if (keyExists) info.key = await fs.readFile(recordingFilePath(id, 'key'), 'utf8');
   }
 
   // fill in features
   if (!info.features) {
-    const featsExists = await fileExists(path.join(recPath, `${id}.ogg.features`));
-    if (featsExists) info.features = JSON.parse(await fs.readFile(path.join(recPath, `${id}.ogg.features`), 'utf8'));
+    const featsExists = await fileExists(recordingFilePath(id, 'features'));
+    if (featsExists) info.features = JSON.parse(await fs.readFile(recordingFilePath(id, 'features'), 'utf8'));
     else info.features = {};
   }
 
@@ -114,14 +134,54 @@ export async function getRecordingAccess(id: string): Promise<RecordingAccess | 
   });
 }
 
-export async function deleteRecording(id: string): Promise<void> {
-  const keyExists = await fileExists(path.join(recPath, `${id}.ogg.key`));
-  const featsExists = await fileExists(path.join(recPath, `${id}.ogg.features`));
-  const unlinkResults = await Promise.allSettled(
-    ['data', 'header1', 'header2', ...(keyExists ? ['key'] : []), ...(featsExists ? ['features'] : [])].map((ext) =>
-      fs.unlink(path.join(recPath, `${id}.ogg.${ext}`))
-    )
-  );
+export async function isAudioAvailable(id: string): Promise<boolean> {
+  return !(await Promise.all(audioTypes.map((ext) => fileExists(recordingFilePath(id, ext))))).some((exists) => exists === false);
+}
+
+export async function readPersistedDuration(id: string): Promise<number | null> {
+  const file = recordingFilePath(id, 'duration');
+  if (!(await fileExists(file))) return null;
+  const parsed = Number.parseFloat((await fs.readFile(file, 'utf8')).trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export async function writePersistedDuration(id: string, duration: number): Promise<void> {
+  await fs.writeFile(recordingFilePath(id, 'duration'), `${duration}`, 'utf8');
+}
+
+export async function readPersistedNotes(id: string): Promise<RecordingNote[] | null> {
+  const file = recordingFilePath(id, 'notes');
+  if (!(await fileExists(file))) return null;
+  return JSON.parse(await fs.readFile(file, 'utf8')) as RecordingNote[];
+}
+
+export async function writePersistedNotes(id: string, notes: RecordingNote[]): Promise<void> {
+  await fs.writeFile(recordingFilePath(id, 'notes'), JSON.stringify(notes), 'utf8');
+}
+
+export async function getRecordingPageInfo(id: string): Promise<DurableRecordingPageInfo | null> {
+  const info = await readRecordingInfo(id);
+  if (!info) return null;
+  const audioAvailable = await isAudioAvailable(id);
+  const duration = await readPersistedDuration(id);
+  return {
+    ...info,
+    audioAvailable,
+    audioExpired: !audioAvailable,
+    duration
+  };
+}
+
+export async function getRecordingUsersDurable(id: string): Promise<RecordingUser[] | null> {
+  const file = recordingFilePath(id, 'users');
+  if (!(await fileExists(file))) return null;
+  const userText = await fs.readFile(file, 'utf8');
+  const users: { [index: string]: RecordingUser } = JSON.parse(`{${userText}}`);
+  return Object.values(users).filter((user) => Object.keys(user).length !== 0);
+}
+
+async function unlinkRecordingTypes(id: string, types: readonly string[]): Promise<void> {
+  const unlinkResults = await Promise.allSettled(types.map((type) => fs.unlink(recordingFilePath(id, type))));
 
   for (const result of unlinkResults) {
     if (result.status === 'rejected' && (result.reason as { code?: string })?.code !== 'ENOENT') throw result.reason;
@@ -129,9 +189,15 @@ export async function deleteRecording(id: string): Promise<void> {
 }
 
 export async function getUsers(id: string): Promise<RecordingUser[]> {
-  const userText = await fs.readFile(path.join(recPath, `${id}.ogg.users`), 'utf8');
-  const users: { [index: string]: RecordingUser } = JSON.parse(`{${userText}}`);
-  return Object.values(users).filter((user) => Object.keys(user).length !== 0);
+  return (await getRecordingUsersDurable(id)) ?? [];
+}
+
+export async function expireRecordingAudio(id: string): Promise<void> {
+  await unlinkRecordingTypes(id, audioTypes);
+}
+
+export async function deleteRecordingArtifacts(id: string): Promise<void> {
+  await unlinkRecordingTypes(id, [...audioTypes, ...deletableMetadataTypes]);
 }
 
 export function keyMatches(rec: RecordingInfo, key: string) {
