@@ -1,0 +1,97 @@
+{
+    "modal": {
+        "duration_fail": "Kaydın uzunluğunu bulamıyorum!",
+        "ennuizel": "Kırmızı tuşlara dikkat et!",
+        "general": "Kip (Ekleri)",
+        "download_done": "İndirme hazır!",
+        "download_fail": "Yükleme tamamlanamadı!",
+        "delete_rec": "Kaydı sil?",
+        "error": "Bir hata oluştu."
+    },
+    "error": {
+        "no_del_key": "Lütfen bir silme kodu girin.",
+        "unknown": "Bilinmeyen bir hata oluştu.",
+        "1104": "Geçersiz önplan rengi.",
+        "1103": "Geçersiz arkaplan rengi.",
+        "1005": "Geçersiz silme kodu.",
+        "1004": "Kayıt silinmiş.",
+        "1003": "Kayıt bulunamadı.",
+        "1101": "Geçersiz format.",
+        "1002": "Geçersiz kod.",
+        "1001": "Geçersiz ID."
+    },
+    "download": {
+        "movpngsfxm": "(PNG, Mac OS X çıkışlı)",
+        "mac": "Mac OS X Uygulaması",
+        "movpngsfx": "(PNG, Windows çıkışlı)",
+        "movpngsfxu": "(PNG, Unix çıkışlı)",
+        "win": "Windows Uygulaması",
+        "audacity": "Audacity Projesi",
+        "info": "Bilgi",
+        "raw": "RAW",
+        "other": "Diğer"
+    },
+    "modal_content": {
+        "enter_del_key": "Silme kodunu buraya gir:",
+        "download_processing": "İndirme işlemi başlıyor…",
+        "ennuizel_dont_show": "Bunu bir daha gösterme",
+        "ennuizel_confirm": "Anladım, kabul ediyorum.",
+        "download": "İndir",
+        "download_avatar_fail": "Profil fotoğraflarını indirme başarısız.",
+        "download_fail": "{{format}} formatında indirme başarısız.",
+        "downloading_avatar": "Profil fotoğrafları indiriliyor…",
+        "downloading": "{{format}} formatında indiriliyor…"
+    },
+    "glowers": {
+        "transparent_bg": "Transparan Arkaplan",
+        "fg_color": "Çerçeve Rengi",
+        "bg_color": "Arkaplan Rengi",
+        "download": "İndir",
+        "format": "Format"
+    },
+    "info": {
+        "req_by": "Kaydı Alan Kişi",
+        "behalf": "tarafından",
+        "delete_rec": "Kaydı Sil",
+        "duration": "Süre",
+        "channel": "Ses Kanalı",
+        "server": "Sunucu",
+        "expires": "Kayıt {{expire}} tarihinde kullanılmaz olacak.",
+        "started": "Başlama Zamanı",
+        "rec_id": "Kayıt ID'si",
+        "users": "Kullanıcılar"
+    },
+    "craig_rec": "Craig Kaydediyor",
+    "ms": {
+        "ms_other": "{{count}} salise",
+        "m_other": "{{count}} dakika",
+        "m_one": "{{count}} dakika",
+        "s_other": "{{count}} saniye",
+        "s_one": "{{count}} saniye",
+        "ms_one": "{{count}} salise",
+        "y_other": "{{count}} yıl",
+        "y_one": "{{count}} yıl",
+        "d_other": "{{count}} gün",
+        "d_one": "{{count}} gün",
+        "h_other": "{{count}} saat",
+        "h_one": "{{count}} saat"
+    },
+    "sections": {
+        "other_formats": "Diğer formatlar",
+        "avatars": "Profil Fotoğrafları",
+        "dl": "İndirilenler",
+        "glowers": "Profil Fotoğrafı Görünümleri",
+        "mt": "Çoklu-Parça"
+    },
+    "footer": {
+        "build": "Sürüm"
+    },
+    "processing": "İşleniyor…",
+    "reveal": "Göster",
+    "delete": "Sil",
+    "cancel": "İptal et",
+    "close": "Kapat",
+    "downloading": "Yükleniyor…",
+    "loading": "Yükleniyor…",
+    "_local_name": "Türkçe"
+}

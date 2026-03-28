@@ -1,12 +1,12 @@
 {
   "name": "craig",
-  "homepage": "http://craig.chat/",
+  "homepage": "https://github.com/xenshreyas/cpsc-436c/tree/main/capstone/discord-craig",
   "license": "ISC",
   "private": true,
   "author": {
-    "name": "Snazzah",
-    "email": "me@snazzah.com",
-    "url": "https://snazzah.com/"
+    "name": "Shreyas Goyal",
+    "email": "xenshreyas@gmail.com",
+    "url": "https://github.com/xenshreyas"
   },
   "workspaces": [
     "apps/bot",
@@ -31,7 +31,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/CraigChat/craig"
+    "url": "https://github.com/xenshreyas/cpsc-436c"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",

@@ -8,7 +8,8 @@ import type { CraigBotConfig } from '../bot';
 import { prisma } from '../prisma';
 import { checkMaintenance, processCooldown } from '../redis';
 import { reportAutorecordingError } from '../sentry';
-import { cutoffText, getSelfMember, makeDownloadMessage, parseRewards } from '../util';
+import { cutoffText, getSelfMember, parseRewards } from '../util';
+import { getAccountAdmissionDecisionForGuild, getBillingPageUrl } from './billing';
 import EntitlementsModule from './entitlements';
 import type RecorderModule from './recorder';
 import Recording, { RecordingState } from './recorder/recording';
@@ -173,6 +174,31 @@ export default class AutorecordModule extends DexareModule<DexareClient<CraigBot
     }
 
     if (shouldRecord && !recording) {
+      const admission = await getAccountAdmissionDecisionForGuild(guildId);
+      if (!admission.allowed) {
+        if (admission.reason !== 'OWNER_LINK_REQUIRED' && admission.billingUserId) {
+          const reasonLine =
+            admission.reason === 'MONTHLY_CAP_REACHED'
+              ? `Autorecord in **${guild.name}** could not start because your Silhouette paid usage cap of $${admission.monthlyCapUsd}/month has been reached.`
+              : admission.reason === 'CANCELLED'
+                ? `Autorecord in **${guild.name}** could not start because your Silhouette billing subscription has been cancelled.`
+                : admission.reason === 'SUBSCRIPTION_INACTIVE'
+                  ? `Autorecord in **${guild.name}** could not start because your Silhouette billing subscription is not active.`
+                  : `Autorecord in **${guild.name}** could not start because your Silhouette AI trial credits have been exhausted.`;
+          const owner = this.client.bot.users.get(admission.billingUserId) || (await this.client.bot.getRESTUser(admission.billingUserId).catch(() => null));
+          const dmChannel = owner ? await owner.getDMChannel().catch(() => null) : null;
+          await dmChannel
+            ?.createMessage(
+              [
+                reasonLine,
+                `Configure billing in the dashboard to continue using AI features: ${getBillingPageUrl(this.client.config.craig.dashboardURL)}`
+              ].join('\n\n')
+            )
+            .catch(() => null);
+        }
+        return;
+      }
+
       // Get rewards
       const userData = await prisma.user.findFirst({ where: { id: autoRecording.userId } });
       const blessing = await prisma.blessing.findFirst({ where: { guildId: guildId } });
@@ -215,7 +241,7 @@ export default class AutorecordModule extends DexareModule<DexareClient<CraigBot
         }
 
       // Start recording
-      const recording = new Recording(this.recorder, channel as any, member.user, true);
+      const recording = new Recording(this.recorder, channel as any, member.user, admission.billingUserId, admission.billingMode, true);
       this.recorder.recordings.set(guildId, recording);
       if (autoRecording.postChannelId) {
         const postChannel = guild.channels.get(autoRecording.postChannelId);
@@ -282,9 +308,6 @@ export default class AutorecordModule extends DexareModule<DexareClient<CraigBot
         return;
       }
 
-      // Try to DM user
-      const dmChannel = await member.user.getDMChannel().catch(() => null);
-      if (dmChannel) await dmChannel.createMessage(makeDownloadMessage(recording, parsedRewards, this.client.config, this.emojis)).catch(() => null);
     }
   }
 

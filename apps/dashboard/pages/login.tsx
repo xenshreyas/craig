@@ -41,7 +41,13 @@ export default function Login() {
               <br />
               <span>We use cookies to keep you logged in. By logging in, you allow us to store and use them.</span>
             </div>
-            <Button type="brand" onClick={() => (location.href = '/api/login')}>
+            <Button
+              type="brand"
+              onClick={() => {
+                const next = new URLSearchParams(window.location.search).get('next');
+                location.href = next ? `/api/login?next=${encodeURIComponent(next)}` : '/api/login';
+              }}
+            >
               Login
             </Button>
             <div className="flex gap-4 flex-wrap justify-center">
@@ -57,11 +63,12 @@ export default function Login() {
 
 export const getServerSideProps: GetServerSideProps = async function (ctx) {
   const user = parseUser(ctx.req);
+  const next = typeof ctx.query.next === 'string' ? ctx.query.next : '/';
 
   if (user)
     return {
       redirect: {
-        destination: '/',
+        destination: next.startsWith('/') ? next : '/',
         permanent: false
       }
     };

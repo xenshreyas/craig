@@ -1,4 +1,4 @@
-import { TranscriptStatus } from '@prisma/client';
+import { AiUsageKind, TranscriptStatus } from '@prisma/client';
 import config from 'config';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -11,6 +11,8 @@ import { pipeline } from 'node:stream/promises';
 import { createLogger } from '../logger';
 import { prisma } from '../prisma';
 import { client as redisClient } from '../redis';
+import { estimateTranscriptCostMicrosFromUsageSeconds, recordUsageEvent } from '../budget';
+import { finalizeStripeBillingForRecording } from '../stripeBilling';
 import { enqueueSummary } from '../summary/worker';
 import { OpenAIWhisperProvider } from './openaiWhisperProvider';
 import { TranscriptionProvider } from './provider';
@@ -153,6 +155,12 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
   let tempChunkDir: string | null = null;
   const start = Date.now();
   try {
+    const recording = await prisma.recording.findUnique({
+      where: { id: recordingId },
+      select: { id: true, guildId: true, billingUserId: true }
+    });
+    if (!recording) return;
+
     await ensureTranscriptRow(recordingId);
     const transcript = await prisma.recordingTranscript.findUnique({ where: { recordingId } });
     if (!transcript) return;
@@ -194,8 +202,11 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
     const stats = await fsp.stat(tempAudioPath);
     const maxBytes = transcriptConfig.maxFileMb * 1024 * 1024;
     let text = '';
+    let usageSeconds = durationSec;
     if (stats.size <= maxBytes) {
-      text = await provider.transcribe(tempAudioPath, transcriptConfig.model);
+      const result = await provider.transcribe(tempAudioPath, transcriptConfig.model);
+      text = result.text;
+      if (typeof result.usageSeconds === 'number') usageSeconds = result.usageSeconds;
     } else if (!transcriptConfig.chunkEnabled) {
       await markSkipped(
         recordingId,
@@ -209,6 +220,7 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
       const chunkResult = await transcribeWithChunking(recordingId, tempAudioPath, provider, transcriptConfig.model, maxBytes);
       tempChunkDir = chunkResult.chunkDir;
       text = chunkResult.text;
+      usageSeconds = chunkResult.usageSeconds;
     }
 
     await prisma.recordingTranscript.update({
@@ -223,6 +235,15 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
         errorCode: null,
         errorMessage: null
       }
+    });
+    await recordUsageEvent({
+      prisma,
+      guildId: recording.guildId,
+      billingUserId: recording.billingUserId,
+      recordingId,
+      kind: AiUsageKind.TRANSCRIPT,
+      model: transcriptConfig.model,
+      costUsdMicros: estimateTranscriptCostMicrosFromUsageSeconds(usageSeconds)
     });
     await enqueueSummary(recordingId).catch((err) => {
       logger.error('Failed to enqueue summary for %s', recordingId, err);
@@ -241,6 +262,9 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
         }
       })
       .catch(() => {});
+    await finalizeStripeBillingForRecording(recordingId).catch((billingErr) => {
+      logger.error('Failed to finalize Stripe billing for %s after transcript error', recordingId, billingErr);
+    });
     logger.error(`Transcript failed for ${recordingId} (${code})`, err);
   } finally {
     if (tempAudioPath) await fsp.unlink(tempAudioPath).catch(() => {});
@@ -256,14 +280,14 @@ async function transcribeWithChunking(
   provider: TranscriptionProvider,
   model: string,
   maxBytes: number
-): Promise<{ text: string; chunkDir: string }> {
+): Promise<{ text: string; chunkDir: string; usageSeconds: number }> {
   const chunkDir = path.join(tmpdir(), `craig-transcript-${recordingId}-${Date.now()}`);
   await fsp.mkdir(chunkDir, { recursive: true });
 
   const chunkPaths = await transcodeAndSegmentToChunks(mixedPath, chunkDir);
   await validateChunkSizes(chunkPaths, maxBytes);
-  const text = await transcribeChunksSequentially(recordingId, chunkPaths, provider, model);
-  return { text, chunkDir };
+  const result = await transcribeChunksSequentially(recordingId, chunkPaths, provider, model);
+  return { text: result.text, chunkDir, usageSeconds: result.usageSeconds };
 }
 
 async function transcodeAndSegmentToChunks(inputPath: string, outputDir: string) {
@@ -330,21 +354,26 @@ async function validateChunkSizes(chunkPaths: string[], maxBytes: number) {
 
 async function transcribeChunksSequentially(recordingId: string, chunkPaths: string[], provider: TranscriptionProvider, model: string) {
   const chunkTexts: string[] = [];
+  let usageSeconds = 0;
   for (let i = 0; i < chunkPaths.length; i++) {
     const chunkPath = chunkPaths[i];
     logger.info('Transcribing chunk %d/%d for %s (%s)', i + 1, chunkPaths.length, recordingId, path.basename(chunkPath));
     try {
-      const text = await provider.transcribe(chunkPath, model);
-      chunkTexts.push(text);
+      const result = await provider.transcribe(chunkPath, model);
+      chunkTexts.push(result.text);
+      usageSeconds += result.usageSeconds ?? 0;
     } catch (err) {
       const msg = err instanceof Error ? err.message.slice(0, 300) : 'Unknown chunk transcription error';
       throw new Error(`chunk_transcribe_failed:Chunk ${i + 1}/${chunkPaths.length} failed (${msg})`);
     }
   }
-  return chunkTexts
-    .map((chunkText) => chunkText.trim())
-    .filter((chunkText) => chunkText.length > 0)
-    .join('\n\n');
+  return {
+    text: chunkTexts
+      .map((chunkText) => chunkText.trim())
+      .filter((chunkText) => chunkText.length > 0)
+      .join('\n\n'),
+    usageSeconds
+  };
 }
 
 async function ensureTranscriptRow(recordingId: string) {
@@ -407,6 +436,9 @@ async function markSkipped(recordingId: string, errorCode: string, errorMessage:
       audioBytes,
       completedAt: new Date()
     }
+  });
+  await finalizeStripeBillingForRecording(recordingId).catch((err) => {
+    logger.error('Failed to finalize Stripe billing for %s after transcript skip', recordingId, err);
   });
   logger.warn('Transcript skipped for %s (%s)', recordingId, errorCode);
 }

@@ -1,17 +1,17 @@
 import { basename } from 'node:path';
 import fs from 'node:fs/promises';
 
-import { TranscriptionProvider } from './provider';
+import { TranscriptionProvider, TranscriptionResult } from './provider';
 
 export class OpenAIWhisperProvider implements TranscriptionProvider {
   constructor(private readonly apiKey: string) {}
 
-  async transcribe(filePath: string, model: string): Promise<string> {
+  async transcribe(filePath: string, model: string): Promise<TranscriptionResult> {
     const audio = await fs.readFile(filePath);
     const fileType = getAudioMimeType(filePath);
     const form = new (globalThis as any).FormData();
     form.set('model', model);
-    form.set('response_format', 'text');
+    form.set('response_format', 'json');
     form.set('file', new (globalThis as any).Blob([audio], { type: fileType }), basename(filePath));
 
     const response = await (globalThis as any).fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -22,9 +22,18 @@ export class OpenAIWhisperProvider implements TranscriptionProvider {
       body: form
     });
 
-    const text = await response.text();
-    if (!response.ok) throw new Error(`openai_http_${response.status}:${text.slice(0, 300)}`);
-    return text.trim();
+    const body = await response.text();
+    if (!response.ok) throw new Error(`openai_http_${response.status}:${body.slice(0, 300)}`);
+
+    const json = JSON.parse(body);
+    const text = typeof json?.text === 'string' ? json.text.trim() : '';
+    if (!text) throw new Error('openai_transcription_invalid_response:Missing text');
+
+    return {
+      text,
+      usageSeconds: typeof json?.usage?.seconds === 'number' ? json.usage.seconds : null,
+      rawUsage: json?.usage ?? null
+    };
   }
 }
 

@@ -4,10 +4,13 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 
+import BillingBanner from '../components/billingBanner';
+import BudgetCard from '../components/budgetCard';
 import Button from '../components/button';
 import DropboxButton from '../components/dropboxButton';
 import Dropdown, { DropdownItem } from '../components/dropdown';
 import GoogleButton from '../components/googleButton';
+import GuildCard from '../components/guildCard';
 import Link from '../components/link';
 import MicrosoftButton from '../components/microsoftButton';
 import { Modal } from '../components/modal';
@@ -20,7 +23,8 @@ import OneDriveLogo from '../components/svg/oneDrive';
 import PatreonLogo from '../components/svg/patreon';
 import Toggle from '../components/toggle';
 import prisma from '../lib/prisma';
-import { getAvatarUrl, parseUser } from '../utils';
+import { getAvatarUrl, formatUsdFromCents, formatUsdFromMicros, getGuildIconUrl, parseUser } from '../utils';
+import { getAccountTrialTotalMicros } from '../utils/budget';
 import { DiscordUser } from '../utils/types';
 
 interface Props {
@@ -32,6 +36,16 @@ interface Props {
   googleDrive: boolean;
   microsoft: boolean;
   dropbox: boolean;
+  linkedGuilds: LinkedGuild[];
+  lifetimeUsageMicros: number;
+  currentMonthUsageMicros: number;
+  currentMonthBilledCents: number;
+  trialRemainingMicros: number;
+  trialTotalMicros: number;
+  aiBillingMonthlyCapUsd: number;
+  trialExhausted: boolean;
+  hasStripeSetup: boolean;
+  hasBillingOverride: boolean;
 }
 
 interface DriveProps {
@@ -39,6 +53,13 @@ interface DriveProps {
   service: string;
   format: string;
   container: string;
+}
+
+interface LinkedGuild {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  spentMicros: number;
 }
 
 const tierNames: { [key: number]: string } = {
@@ -195,6 +216,12 @@ export default function Index(props: Props) {
           <Link href="https://www.dropbox.com/account/connected_apps">Dropbox settings</Link>.
         </span>
       );
+    } else if (r === 'server_linked') {
+      title = 'Server linked!';
+      content = 'Your server is now linked to your Silhouette dashboard.';
+    } else if (r === 'publish_started') {
+      title = 'Publish started';
+      content = 'The meeting notes are being published to #silhouette.';
     }
 
     if (title && content) {
@@ -283,6 +310,54 @@ export default function Index(props: Props) {
             </span>
           </h1>
           <div className="flex flex-col justify-center items-center p-6 gap-4 w-full">
+            <Section title="Your Servers" big>
+              {props.trialExhausted && !props.hasStripeSetup && !props.hasBillingOverride ? <BillingBanner /> : null}
+              <BudgetCard
+                title="Trial Credits"
+                spentMicros={Math.min(props.lifetimeUsageMicros, props.trialTotalMicros)}
+                capMicros={props.trialTotalMicros}
+              />
+              <div className="w-full rounded-md bg-zinc-600 px-4 py-4 text-sm text-zinc-200 shadow-md">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <div>
+                      Current month account usage:{' '}
+                      {props.hasStripeSetup ? formatUsdFromCents(props.currentMonthBilledCents) : formatUsdFromMicros(props.currentMonthUsageMicros)}
+                    </div>
+                    <div>Future monthly hard cap: ${props.aiBillingMonthlyCapUsd}</div>
+                  </div>
+                  <a
+                    href="/billing"
+                    className="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 font-medium text-white transition-colors hover:bg-teal-500"
+                  >
+                    Open Billing
+                  </a>
+                </div>
+              </div>
+              <div className="flex w-full items-center justify-between gap-4">
+                <span className="text-sm text-zinc-300">
+                  Linked servers: <span className="font-medium text-white">{props.linkedGuilds.length}</span>
+                </span>
+                <Button type="brand" onClick={() => (location.href = '/api/install/start')}>
+                  Add Server
+                </Button>
+              </div>
+              {props.linkedGuilds.length === 0 ? (
+                <div className="w-full rounded-md bg-zinc-600 px-4 py-4 text-zinc-300 shadow-md">
+                  No servers linked yet. Use Add Server to install Silhouette and claim ownership in the dashboard.
+                </div>
+              ) : (
+                props.linkedGuilds.map((guild) => (
+                  <GuildCard
+                    key={guild.id}
+                    guildId={guild.id}
+                    name={guild.name}
+                    iconUrl={guild.iconUrl}
+                    spentLabel={formatUsdFromMicros(guild.spentMicros)}
+                  />
+                ))
+              )}
+            </Section>
             <div className="flex justify-center items-center gap-2 text-xl font-display">
               <span className="font-medium">Current Tier:</span>
               <span
@@ -446,6 +521,8 @@ export default function Index(props: Props) {
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async function (ctx) {
+  const { getAccountTrialRemainingMicros, getBillingStatus, getCurrentMonthAccountUsageMicros, getGuildUsageSummaries, getLifetimeAccountUsageMicros } =
+    await import('../utils/budgetData');
   const user = parseUser(ctx.req);
 
   if (!user)
@@ -461,6 +538,15 @@ export const getServerSideProps: GetServerSideProps<Props> = async function (ctx
   const googleDrive = await prisma.googleDriveUser.findUnique({ where: { id: user.id } });
   const microsoft = await prisma.microsoftUser.findUnique({ where: { id: user.id } });
   const dropbox = await prisma.dropboxUser.findUnique({ where: { id: user.id } });
+  const linkedGuilds = await prisma.guild.findMany({
+    where: { ownerUserId: user.id },
+    orderBy: { linkedAt: 'desc' }
+  });
+  const usageSummaries = await getGuildUsageSummaries(linkedGuilds.map((guild) => guild.id));
+  const lifetimeUsageMicros = await getLifetimeAccountUsageMicros(user.id);
+  const currentMonthUsageMicros = await getCurrentMonthAccountUsageMicros(user.id);
+  const trialRemainingMicros = await getAccountTrialRemainingMicros(user.id);
+  const billingStatus = await getBillingStatus(user.id);
 
   return {
     props: {
@@ -476,7 +562,22 @@ export const getServerSideProps: GetServerSideProps<Props> = async function (ctx
       },
       googleDrive: !!googleDrive,
       microsoft: !!microsoft,
-      dropbox: !!dropbox
+      dropbox: !!dropbox,
+      lifetimeUsageMicros,
+      currentMonthUsageMicros,
+      currentMonthBilledCents: billingStatus.currentMonthBilledCents,
+      trialRemainingMicros,
+      trialTotalMicros: getAccountTrialTotalMicros(),
+      aiBillingMonthlyCapUsd: dbUser?.aiBillingMonthlyCapUsd ?? 10,
+      trialExhausted: trialRemainingMicros <= 0,
+      hasStripeSetup: billingStatus.hasStripeSetup,
+      hasBillingOverride: billingStatus.status === 'BILLING_OVERRIDE',
+      linkedGuilds: linkedGuilds.map((guild) => ({
+        id: guild.id,
+        name: guild.name || `Guild ${guild.id}`,
+        iconUrl: getGuildIconUrl(guild.id, guild.icon),
+        spentMicros: usageSummaries.get(guild.id) ?? 0
+      }))
     }
   };
 };

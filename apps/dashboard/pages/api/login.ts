@@ -22,6 +22,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'GET') return res.redirect('/');
 
   const { code = null, error = null } = req.query;
+  const next = typeof req.query.next === 'string' ? req.query.next : '/';
 
   if (error) return res.redirect(`/?error=${req.query.error}&from=discord`);
 
@@ -56,12 +57,12 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     'Set-Cookie',
     serialize(config.cookieName, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
+      secure: config.cookieSecure,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7
     })
   );
 
-  res.redirect('/');
+  res.redirect(next.startsWith('/') ? next : '/');
 };

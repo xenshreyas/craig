@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "private": true,
   "author": {
-    "name": "Snazzah",
-    "email": "me@snazzah.com",
-    "url": "https://snazzah.com/"
+    "name": "Shreyas Goyal",
+    "email": "xenshreyas@gmail.com",
+    "url": "https://github.com/xenshreyas"
   },
   "scripts": {
     "start": "dotenv -e ../../.env -c -- node dist/index.js",

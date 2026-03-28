@@ -2,7 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'Craig Tasks',
-      script: 'dist/index.js',
+      script: 'npm',
+      args: 'start',
       wait_ready: true,
       kill_timeout: 3000,
       env: {

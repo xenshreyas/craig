@@ -13,9 +13,15 @@ datasource db {
 model User {
   id String @id
 
-  rewardTier      Int     @default(0)
-  patronId        String?
-  tierManuallySet Boolean @default(false)
+  rewardTier               Int     @default(0)
+  patronId                 String?
+  tierManuallySet          Boolean @default(false)
+  aiBillingMonthlyCapUsd Int @default(10)
+  stripeCustomerId         String?
+  stripeSubscriptionId     String?
+  stripeSubscriptionItemId String?
+  stripeSubscriptionStatus String?
+  stripeCancelAtPeriodEnd  Boolean @default(false)
 
   webapp Boolean @default(false)
 
@@ -41,28 +47,37 @@ model Ban {
 
 model Guild {
   id          String   @id
+  ownerUserId String?
+  linkedAt    DateTime? @db.Timestamptz(6)
+  name        String?
+  icon        String?
   accessRoles String[]
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  aiUsageEvents GuildAiUsageEvent[]
 }
 
 model Recording {
-  id           String    @id
-  accessKey    String
-  deleteKey    String
-  userId       String
-  channelId    String
-  guildId      String
-  clientId     String
-  shardId      Int
-  autorecorded Boolean   @default(false)
-  rewardTier   Int       @default(0)
-  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
-  endedAt      DateTime? @db.Timestamptz(6)
-  errored      Boolean   @default(false)
-  expiresAt    DateTime  @db.Timestamptz(6)
-  transcript   RecordingTranscript?
-  summary      RecordingSummary?
+  id            String               @id
+  accessKey     String
+  deleteKey     String
+  userId        String
+  billingUserId String?
+  billingMode   RecordingBillingMode @default(TRIAL)
+  channelId     String
+  guildId       String
+  clientId      String
+  shardId       Int
+  autorecorded  Boolean              @default(false)
+  rewardTier    Int                  @default(0)
+  createdAt     DateTime             @default(now()) @db.Timestamptz(6)
+  endedAt       DateTime?            @db.Timestamptz(6)
+  errored       Boolean              @default(false)
+  expiresAt     DateTime             @db.Timestamptz(6)
+  transcript    RecordingTranscript?
+  summary       RecordingSummary?
+  stripeBillingUsageReport StripeBillingUsageReport?
 
   @@index([userId, createdAt(sort: Desc)])
 }
@@ -81,6 +96,30 @@ enum SummaryStatus {
   COMPLETE
   ERROR
   SKIPPED
+}
+
+enum SummaryPublishStatus {
+  NOT_READY
+  READY
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+enum RecordingBillingMode {
+  TRIAL
+  PAID
+}
+
+enum AiUsageKind {
+  TRANSCRIPT
+  SUMMARY
+}
+
+enum StripeBillingUsageReportStatus {
+  PENDING
+  REPORTED
+  FAILED
 }
 
 model RecordingTranscript {
@@ -104,21 +143,64 @@ model RecordingTranscript {
 }
 
 model RecordingSummary {
-  recordingId  String        @id
-  status       SummaryStatus @default(PENDING)
-  provider     String        @default("openai")
-  model        String        @default("gpt-5-mini")
-  attempts     Int           @default(0)
-  startedAt    DateTime?     @db.Timestamptz(6)
-  completedAt  DateTime?     @db.Timestamptz(6)
-  errorCode    String?
-  errorMessage String?
-  markdown     String?
-  preview      String?
-  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  recordingId        String               @id
+  status             SummaryStatus        @default(PENDING)
+  publishStatus      SummaryPublishStatus @default(NOT_READY)
+  dmSent             Boolean              @default(false)
+  provider           String               @default("openai")
+  model              String               @default("gpt-5.4-mini")
+  attempts           Int                  @default(0)
+  startedAt          DateTime?            @db.Timestamptz(6)
+  completedAt        DateTime?            @db.Timestamptz(6)
+  publishedAt        DateTime?            @db.Timestamptz(6)
+  publishedChannelId String?
+  publishedMessageId String?
+  errorCode          String?
+  errorMessage       String?
+  publishError       String?
+  markdown           String?
+  preview            String?
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(6)
 
   recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+}
+
+model GuildAiUsageEvent {
+  id            String      @id @default(cuid())
+  guildId       String
+  billingUserId String?
+  recordingId   String
+  kind          AiUsageKind
+  model         String
+  costUsdMicros Int
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([recordingId, kind])
+  @@index([guildId, createdAt])
+  @@index([billingUserId, createdAt])
+}
+
+model StripeBillingUsageReport {
+  id                     String                        @id @default(cuid())
+  recordingId            String                        @unique
+  billingUserId          String
+  amountCents            Int
+  providerCostUsdMicros  Int
+  status                 StripeBillingUsageReportStatus @default(PENDING)
+  stripeSubscriptionItemId String
+  reportedAt             DateTime?                     @db.Timestamptz(6)
+  attempts               Int                           @default(0)
+  lastError              String?
+  createdAt              DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                      @updatedAt @db.Timestamptz(6)
+
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@index([billingUserId, createdAt])
+  @@index([status, updatedAt])
 }
 
 model AutoRecord {

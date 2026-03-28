@@ -182,17 +182,9 @@ export default class MetricsModule extends ShardManagerModule {
 
     for (const command of [
       'autorecord',
-      'bless',
-      'features',
-      'info',
       'join',
-      'note',
       'recordings',
-      'server-settings',
-      'stop',
-      'unbless',
-      'webapp',
-      'voice-test'
+      'stop'
     ])
       cmdUsage.inc({ command }, 0);
 

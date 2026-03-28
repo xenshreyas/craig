@@ -89,7 +89,7 @@ export default class ShardManager extends EventEmitter {
   async findGuild(guildID: string) {
     for (const shard of this.shards.values()) {
       try {
-        const res = await shard.eval(`this.guilds.has('${guildID}')`);
+        const res = await shard.eval(`Boolean((this.bot?.guilds ?? this.guilds)?.has('${guildID}'))`);
         if (res) return shard;
       } catch (e) {}
     }

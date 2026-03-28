@@ -15,6 +15,8 @@ import MetricsModule from './modules/metrics';
 import RecorderModule from './modules/recorder';
 import ShardingModule from './modules/sharding';
 import SlashModule from './modules/slash';
+import SummaryPublishModule from './modules/summaryPublish';
+import SummaryNotificationsModule from './modules/summaryNotifications';
 import UploadModule from './modules/upload';
 import { prisma } from './prisma';
 import { client as redisClient } from './redis';
@@ -137,6 +139,8 @@ export async function connect() {
     RecorderModule,
     AutorecordModule,
     MetricsModule,
+    SummaryPublishModule,
+    SummaryNotificationsModule,
     UploadModule,
     EntitlementsModule,
     CacheModule

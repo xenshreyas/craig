@@ -26,10 +26,8 @@ export default class JoinCommand extends TextCommand {
             {
               type: ComponentType.BUTTON,
               style: ButtonStyle.LINK,
-              label: 'Add slash commands to this server',
-              url: `https://discord.com/oauth2/authorize?client_id=${
-                this.client.config.craig.inviteID ?? this.client.config.applicationID
-              }&permissions=0&scope=applications.commands&guild_id=${ctx.guild?.id}`,
+              label: 'Link this server in Silhouette',
+              url: `${this.client.config.craig.dashboardURL.replace(/\/$/, '')}/api/install/start?guild_id=${ctx.guild?.id}`,
               emoji: this.emojis.getPartial('craig') || undefined
             },
             {

@@ -8,7 +8,9 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     'Set-Cookie',
     serialize(config.cookieName, '', {
       maxAge: -1,
-      path: '/'
+      path: '/',
+      secure: config.cookieSecure,
+      sameSite: 'lax'
     })
   );
 

@@ -1,0 +1,2 @@
+ALTER TABLE "RecordingSummary"
+ADD COLUMN "dmSent" BOOLEAN NOT NULL DEFAULT false;

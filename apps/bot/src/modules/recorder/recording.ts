@@ -1,3 +1,4 @@
+import { RecordingBillingMode } from '@prisma/client';
 import { OpusEncoder } from '@discordjs/opus';
 import type { DAVESession } from '@snazzah/davey';
 import axios from 'axios';
@@ -94,6 +95,8 @@ export default class Recording {
   ennuiKey = nanoid(6);
   channel: Eris.StageChannel | Eris.VoiceChannel;
   user: Eris.User;
+  billingUserId: string;
+  billingMode: RecordingBillingMode;
   active = false;
   started = false;
   closing = false;
@@ -135,10 +138,19 @@ export default class Recording {
   latencyWarned = false;
   zeroPacketWarned = false;
 
-  constructor(recorder: RecorderModule<DexareClient<CraigBotConfig>>, channel: Eris.StageChannel | Eris.VoiceChannel, user: Eris.User, auto = false) {
+  constructor(
+    recorder: RecorderModule<DexareClient<CraigBotConfig>>,
+    channel: Eris.StageChannel | Eris.VoiceChannel,
+    user: Eris.User,
+    billingUserId: string,
+    billingMode: RecordingBillingMode,
+    auto = false
+  ) {
     this.recorder = recorder;
     this.channel = channel;
     this.user = user;
+    this.billingUserId = billingUserId;
+    this.billingMode = billingMode;
     this.autorecorded = auto;
     this.sizeLimit = this.recorder.client.config.craig.sizeLimit;
   }
@@ -290,6 +302,8 @@ export default class Recording {
         accessKey: this.accessKey,
         deleteKey: this.deleteKey,
         userId: this.user.id,
+        billingUserId: this.billingUserId,
+        billingMode: this.billingMode,
         channelId: this.channel.id,
         guildId: this.channel.guild.id,
         clientId: this.recorder.client.bot.user.id,
@@ -345,6 +359,8 @@ export default class Recording {
               accessKey: this.accessKey,
               deleteKey: this.deleteKey,
               userId: this.user.id,
+              billingUserId: this.billingUserId,
+              billingMode: this.billingMode,
               channelId: this.channel.id,
               guildId: this.channel.guild.id,
               clientId: this.recorder.client.bot.user.id,

@@ -2,6 +2,7 @@ import { DexareModule } from 'dexare';
 import { nanoid } from 'nanoid';
 
 import type { CraigBot } from '../bot';
+import SummaryPublishModule, { SummaryPublishJob } from './summaryPublish';
 import type { ManagerResponseMessage } from '../sharding/types';
 import { makePlainError } from '../util';
 
@@ -83,6 +84,17 @@ export default class ShardingModule extends DexareModule<CraigBot> {
               name: message.d.message
             });
           if (message.n) this.respond(message.n, { ok: true });
+          return;
+        }
+        case 'executeSummaryPublish': {
+          try {
+            const summaryPublish = this.client.modules.get('summary-publish') as SummaryPublishModule | undefined;
+            if (!summaryPublish) throw new Error('Summary publish module is not loaded.');
+            await summaryPublish.executePublish(message.d as SummaryPublishJob);
+            if (message.n) this.respond(message.n, { ok: true });
+          } catch (e) {
+            if (message.n) this.respond(message.n, { ok: false, error: (e as Error).message || 'Summary publish failed.' });
+          }
           return;
         }
       }

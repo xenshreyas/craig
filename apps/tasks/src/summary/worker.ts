@@ -1,18 +1,22 @@
-import { SummaryStatus, TranscriptStatus } from '@prisma/client';
+import { AiUsageKind, SummaryPublishStatus, SummaryStatus, TranscriptStatus } from '@prisma/client';
 import config from 'config';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 import { createLogger } from '../logger';
 import { prisma } from '../prisma';
 import { client as redisClient } from '../redis';
+import { estimateSummaryCostMicrosFromUsage, getSummaryModelForRecording, recordUsageEvent } from '../budget';
+import { finalizeStripeBillingForRecording } from '../stripeBilling';
 import { OpenAISummaryProvider } from './openaiSummaryProvider';
+import { enqueueSummaryNotification } from './notifications';
 
 interface SummaryConfig {
   enabled: boolean;
   queueKey: string;
   lockTtlS: number;
   popTimeoutS: number;
-  model: string;
   previewChars: number;
   workerConcurrency: number;
   maxTranscriptChars: number;
@@ -23,7 +27,6 @@ const defaultConfig: SummaryConfig = {
   queueKey: 'summary:queue',
   lockTtlS: 14400,
   popTimeoutS: 5,
-  model: 'gpt-5-mini',
   previewChars: 1200,
   workerConcurrency: 1,
   maxTranscriptChars: 120000
@@ -36,7 +39,6 @@ const summaryConfig: SummaryConfig = {
 };
 
 if (process.env.SUMMARY_ENABLED) summaryConfig.enabled = process.env.SUMMARY_ENABLED === 'true';
-if (process.env.OPENAI_SUMMARY_MODEL) summaryConfig.model = process.env.OPENAI_SUMMARY_MODEL;
 if (process.env.SUMMARY_PREVIEW_CHARS) summaryConfig.previewChars = Number(process.env.SUMMARY_PREVIEW_CHARS);
 if (process.env.SUMMARY_WORKER_CONCURRENCY) summaryConfig.workerConcurrency = Number(process.env.SUMMARY_WORKER_CONCURRENCY);
 if (process.env.SUMMARY_MAX_TRANSCRIPT_CHARS) summaryConfig.maxTranscriptChars = Number(process.env.SUMMARY_MAX_TRANSCRIPT_CHARS);
@@ -48,6 +50,9 @@ if (!Number.isFinite(summaryConfig.maxTranscriptChars) || summaryConfig.maxTrans
 
 const logger = createLogger('summary');
 const lockPrefix = 'summary:lock:';
+const recPath = config.has('recording.path')
+  ? path.join(__dirname, '..', '..', config.get<string>('recording.path'))
+  : path.join(__dirname, '..', '..', '..', '..', 'rec');
 
 let workerStarted = false;
 
@@ -83,9 +88,8 @@ export function startSummaryWorker() {
 
   const provider = new OpenAISummaryProvider(apiKey);
   logger.info(
-    'Summary worker started. queue=%s model=%s concurrency=%d maxTranscriptChars=%d',
+    'Summary worker started. queue=%s concurrency=%d maxTranscriptChars=%d',
     summaryConfig.queueKey,
-    summaryConfig.model,
     summaryConfig.workerConcurrency,
     summaryConfig.maxTranscriptChars
   );
@@ -116,8 +120,12 @@ async function processQueuedSummary(recordingId: string, provider: OpenAISummary
   if (!hasLock) return;
 
   const startedAt = Date.now();
+  let recording: { id: string; guildId: string; userId: string; accessKey: string; billingUserId: string | null } | null = null;
   try {
-    const recording = await prisma.recording.findUnique({ where: { id: recordingId }, select: { id: true } });
+    recording = await prisma.recording.findUnique({
+      where: { id: recordingId },
+      select: { id: true, guildId: true, userId: true, accessKey: true, billingUserId: true }
+    });
     if (!recording) {
       logger.warn('Summary skipped for %s (RECORDING_MISSING)', recordingId);
       return;
@@ -132,13 +140,17 @@ async function processQueuedSummary(recordingId: string, provider: OpenAISummary
 
     const transcript = await prisma.recordingTranscript.findUnique({ where: { recordingId } });
     if (!transcript || transcript.status !== TranscriptStatus.COMPLETE) {
-      await markSkipped(recordingId, 'TRANSCRIPT_NOT_READY', 'Transcript is not complete yet.');
+      await markSkipped(recording, 'TRANSCRIPT_NOT_READY', 'Transcript is not complete yet.');
       return;
     }
     if (!transcript.text || !transcript.text.trim()) {
-      await markSkipped(recordingId, 'TRANSCRIPT_EMPTY', 'Transcript completed without text.');
+      await markSkipped(recording, 'TRANSCRIPT_EMPTY', 'Transcript completed without text.');
       return;
     }
+
+    const summaryModel = await getSummaryModelForRecording(prisma, {
+      billingUserId: recording.billingUserId
+    });
 
     await prisma.recordingSummary.update({
       where: { recordingId },
@@ -146,7 +158,7 @@ async function processQueuedSummary(recordingId: string, provider: OpenAISummary
         status: SummaryStatus.PROCESSING,
         attempts: { increment: 1 },
         provider: 'openai',
-        model: summaryConfig.model,
+        model: summaryModel,
         startedAt: new Date(),
         completedAt: null,
         errorCode: null,
@@ -155,19 +167,38 @@ async function processQueuedSummary(recordingId: string, provider: OpenAISummary
     });
 
     const promptInput = truncateTranscript(transcript.text);
-    const markdown = await provider.summarize(promptInput, summaryConfig.model);
-    const normalizedMarkdown = markdown.trim();
+    const result = await provider.summarize(promptInput, summaryModel);
+    const normalizedMarkdown = result.text.trim();
 
     await prisma.recordingSummary.update({
       where: { recordingId },
       data: {
         status: SummaryStatus.COMPLETE,
+        publishStatus: SummaryPublishStatus.READY,
         markdown: normalizedMarkdown,
         preview: normalizedMarkdown.slice(0, Math.max(1, summaryConfig.previewChars)),
         completedAt: new Date(),
         errorCode: null,
         errorMessage: null
       }
+    });
+    await recordUsageEvent({
+      prisma,
+      guildId: recording.guildId,
+      billingUserId: recording.billingUserId,
+      recordingId,
+      kind: AiUsageKind.SUMMARY,
+      model: summaryModel,
+      costUsdMicros: estimateSummaryCostMicrosFromUsage(result.usage ?? {})
+    });
+    await enqueueSummaryCompleteNotification(recordingId, {
+      id: recording.id,
+      userId: recording.userId,
+      accessKey: recording.accessKey,
+      summaryMarkdown: normalizedMarkdown
+    });
+    await finalizeStripeBillingForRecording(recordingId).catch((billingErr) => {
+      logger.error('Failed to finalize Stripe billing for %s after summary completion', recordingId, billingErr);
     });
 
     logger.info('Summary complete for %s in %dms', recordingId, Date.now() - startedAt);
@@ -184,6 +215,19 @@ async function processQueuedSummary(recordingId: string, provider: OpenAISummary
         }
       })
       .catch(() => {});
+    if (recording) {
+      const recipientUserIds = await getSummaryNotificationRecipients(recording);
+      await enqueueSummaryNotification({
+        status: 'ERROR',
+        recordingId,
+        recipientUserIds
+      }).catch((notifyErr) => {
+        logger.error('Failed to enqueue summary error notification for %s', recordingId, notifyErr);
+      });
+    }
+    await finalizeStripeBillingForRecording(recordingId).catch((billingErr) => {
+      logger.error('Failed to finalize Stripe billing for %s after summary error', recordingId, billingErr);
+    });
     logger.error(`Summary failed for ${recordingId} (${code})`, err);
   } finally {
     const token = await redisClient.get(lockKey);
@@ -201,7 +245,82 @@ async function ensureSummaryRow(recordingId: string) {
   });
 }
 
-async function markSkipped(recordingId: string, errorCode: string, errorMessage: string) {
+export async function enqueueSummaryCompleteNotification(
+  recordingId: string,
+  params?: {
+    id: string;
+    userId: string;
+    accessKey: string;
+    summaryMarkdown: string;
+  }
+) {
+  const completeRecording =
+    params ??
+    (await prisma.recording
+      .findUnique({
+        where: { id: recordingId },
+        select: {
+          id: true,
+          userId: true,
+          accessKey: true,
+          summary: {
+            select: {
+              status: true,
+              markdown: true
+            }
+          }
+        }
+      })
+      .then((recording) => {
+        if (!recording || !recording.summary || recording.summary.status !== SummaryStatus.COMPLETE || !recording.summary.markdown) {
+          return null;
+        }
+        return {
+          id: recording.id,
+          userId: recording.userId,
+          accessKey: recording.accessKey,
+          summaryMarkdown: recording.summary.markdown
+        };
+      }));
+
+  if (!completeRecording) {
+    throw new Error(`Summary completion notification requires a complete summary for recording ${recordingId}`);
+  }
+
+  const recipientUserIds = await getSummaryNotificationRecipients(completeRecording);
+  const dmQueued = await enqueueSummaryNotification({
+    status: 'COMPLETE',
+    recordingId,
+    recipientUserIds,
+    accessKey: completeRecording.accessKey,
+    summaryMarkdown: completeRecording.summaryMarkdown
+  }).catch((err) => {
+    logger.error('Failed to enqueue summary success notification for %s', recordingId, err);
+    return false;
+  });
+
+  if (dmQueued) {
+    await prisma.recordingSummary.update({
+      where: { recordingId },
+      data: {
+        dmSent: true
+      }
+    });
+  }
+
+  return {
+    recordingId,
+    recipientUserIds,
+    dmQueued
+  };
+}
+
+async function markSkipped(
+  recording: { id: string; userId: string } | null,
+  errorCode: string,
+  errorMessage: string
+) {
+  const recordingId = recording?.id ?? '';
   await prisma.recordingSummary.update({
     where: { recordingId },
     data: {
@@ -211,7 +330,48 @@ async function markSkipped(recordingId: string, errorCode: string, errorMessage:
       completedAt: new Date()
     }
   });
+  if (recording && errorCode === 'BUDGET_CAP_REACHED') {
+    const recipientUserIds = await getSummaryNotificationRecipients(recording);
+    await enqueueSummaryNotification({
+      status: 'SKIPPED',
+      reason: 'BUDGET_CAP_REACHED',
+      recordingId,
+      recipientUserIds
+    }).catch((err) => {
+      logger.error('Failed to enqueue summary skipped notification for %s', recordingId, err);
+      });
+  }
+  if (recording) {
+    await finalizeStripeBillingForRecording(recording.id).catch((err) => {
+      logger.error('Failed to finalize Stripe billing for %s after summary skip', recording.id, err);
+    });
+  }
   logger.warn('Summary skipped for %s (%s)', recordingId, errorCode);
+}
+
+async function getSummaryNotificationRecipients(recording: { id: string; userId: string }) {
+  const recipients = new Set<string>([recording.userId]);
+  const file = path.join(recPath, `${recording.id}.ogg.users`);
+
+  try {
+    const raw = await fs.readFile(file, 'utf8');
+    const parsed = JSON.parse(`{${raw}}`) as Record<
+      string,
+      {
+        id?: string;
+        bot?: boolean;
+      }
+    >;
+
+    for (const user of Object.values(parsed)) {
+      if (!user?.id || user.bot) continue;
+      recipients.add(user.id);
+    }
+  } catch (err) {
+    logger.warn('Failed to load participant list for summary notifications on %s', recording.id, err);
+  }
+
+  return Array.from(recipients);
 }
 
 function truncateTranscript(text: string) {

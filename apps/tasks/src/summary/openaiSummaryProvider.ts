@@ -1,9 +1,26 @@
 import { SYSTEM_PROMPT } from './prompt';
 
+export interface SummaryUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  input_tokens_details?: {
+    cached_tokens?: number;
+  };
+  output_tokens_details?: {
+    reasoning_tokens?: number;
+  };
+}
+
+export interface SummaryResult {
+  text: string;
+  usage: SummaryUsage | null;
+}
+
 export class OpenAISummaryProvider {
   constructor(private readonly apiKey: string) {}
 
-  async summarize(transcript: string, model: string): Promise<string> {
+  async summarize(transcript: string, model: string): Promise<SummaryResult> {
     const response = await (globalThis as any).fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -41,6 +58,9 @@ export class OpenAISummaryProvider {
       console.error('Summary response output preview:', JSON.stringify(json?.output ?? null).slice(0, 4000));
       throw new Error('summary_invalid_response:Missing output_text');
     }
-    return text.trim();
+    return {
+      text: text.trim(),
+      usage: json?.usage ?? null
+    };
   }
 }

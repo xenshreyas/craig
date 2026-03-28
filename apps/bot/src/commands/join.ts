@@ -1,11 +1,12 @@
 import { oneLine, stripIndents } from 'common-tags';
 import { ButtonStyle, CommandContext, CommandOptionType, ComponentType, EditMessageOptions, SlashCreator } from 'slash-create';
 
+import { getAccountAdmissionDecisionForGuild, getBillingPageUrl } from '../modules/billing';
 import Recording, { RecordingState } from '../modules/recorder/recording';
 import { checkMaintenance, processCooldown } from '../redis';
 import { reportRecordingError } from '../sentry';
 import GeneralCommand from '../slashCommand';
-import { checkBan, checkRecordingPermission, cutoffText, getSelfMember, makeDownloadMessage, parseRewards, stripIndentsAndLines } from '../util';
+import { checkBan, checkRecordingPermission, cutoffText, getSelfMember, parseRewards, stripIndentsAndLines } from '../util';
 
 export default class Join extends GeneralCommand {
   constructor(creator: SlashCreator) {
@@ -131,8 +132,6 @@ export default class Join extends GeneralCommand {
         ],
         ephemeral: true
       };
-    const member = guild.members.get(ctx.user.id) || (await guild.fetchMembers({ userIDs: [ctx.user.id] }))[0];
-
     // Check for existing recording
     if (this.recorder.recordings.has(ctx.guildID)) {
       const recording = this.recorder.recordings.get(ctx.guildID)!;
@@ -177,6 +176,89 @@ export default class Join extends GeneralCommand {
       recording.messageChannelID = ctx.channelID;
       return;
     }
+
+    const admission = await getAccountAdmissionDecisionForGuild(ctx.guildID);
+    if (!admission.allowed) {
+      if (admission.reason === 'OWNER_LINK_REQUIRED') {
+        return {
+          content: stripIndentsAndLines`
+            This server has not been linked to a Silhouette account yet.
+            Link the server in the dashboard before starting AI recordings.
+          `,
+          components: [
+            {
+              type: ComponentType.ACTION_ROW,
+              components: [
+                {
+                  type: ComponentType.BUTTON,
+                  style: ButtonStyle.LINK,
+                  label: 'Open Silhouette',
+                  url: this.client.config.craig.dashboardURL
+                }
+              ]
+            }
+          ],
+          ephemeral: true
+        };
+      }
+
+      const reasonLine =
+        admission.reason === 'MONTHLY_CAP_REACHED'
+          ? `Your Silhouette paid usage cap of $${admission.monthlyCapUsd}/month has been reached.`
+          : admission.reason === 'CANCELLED'
+            ? 'Your Silhouette billing subscription has been cancelled.'
+            : admission.reason === 'SUBSCRIPTION_INACTIVE'
+              ? 'Your Silhouette billing subscription is not currently active.'
+              : 'Your Silhouette AI trial credits have been exhausted.';
+      const actionLine =
+        admission.reason === 'MONTHLY_CAP_REACHED'
+          ? 'Increase your cap or wait until the next month before starting another recording.'
+          : 'Configure billing in the dashboard before starting another recording.';
+
+      const billingUser = this.client.bot.users.get(ctx.user.id) || (await this.client.bot.getRESTUser(ctx.user.id).catch(() => null));
+      const dmSent = await billingUser
+        ?.getDMChannel()
+        .then((channel: any) =>
+          channel.createMessage(
+            [
+              reasonLine,
+              actionLine,
+              `Configure billing in the dashboard to continue using AI features: ${getBillingPageUrl(this.client.config.craig.dashboardURL)}`
+            ].join('\n\n')
+          )
+        )
+        .then(() => true)
+        .catch(() => false) ?? false;
+
+      const blockedMessage = {
+        content: stripIndentsAndLines`
+          ${reasonLine}
+          ${actionLine}
+        `,
+        components: [
+          {
+            type: ComponentType.ACTION_ROW,
+            components: [
+              {
+                type: ComponentType.BUTTON,
+                style: ButtonStyle.LINK,
+                label: 'Open Billing',
+                url: getBillingPageUrl(this.client.config.craig.dashboardURL)
+              }
+            ]
+          }
+        ],
+        ephemeral: true
+      };
+
+      if (!dmSent) return blockedMessage;
+      return {
+        ...blockedMessage,
+        content: `${blockedMessage.content}\n\nI also sent you a DM with the billing link.`
+      };
+    }
+
+    const member = guild.members.get(ctx.user.id) || (await guild.fetchMembers({ userIDs: [ctx.user.id] }))[0];
 
     // Check channel
     let channel = guild.channels.get(ctx.options.channel);
@@ -296,15 +378,6 @@ export default class Join extends GeneralCommand {
         ephemeral: true
       };
 
-    // Check for DM permissions
-    const dmChannel = await member.user.getDMChannel().catch(() => null);
-    if (!dmChannel) {
-      return {
-        content: "I can't DM you, so I can't record. I need to be able to DM you to send you the download link.",
-        ephemeral: true
-      };
-    }
-
     // Nickname the bot
     const selfUser = await getSelfMember(guild, this.client.bot);
     const recNick = cutoffText(`![RECORDING] ${selfUser ? selfUser.nick ?? selfUser.username : this.client.bot.user.username}`, 32);
@@ -332,7 +405,7 @@ export default class Join extends GeneralCommand {
       }
 
     // Start recording
-    const recording = new Recording(this.recorder, channel as any, member.user);
+    const recording = new Recording(this.recorder, channel as any, member.user, admission.billingUserId, admission.billingMode);
     this.recorder.recordings.set(ctx.guildID, recording);
     const { messageID, err } = await ctx
       .editOriginal(recording.messageContent() as any)
@@ -363,66 +436,14 @@ export default class Join extends GeneralCommand {
       return;
     }
 
-    // Send DM
-    const dmMessage = await dmChannel.createMessage(makeDownloadMessage(recording, parsedRewards, this.client.config, this.emojis)).catch(() => null);
+    await ctx.sendFollowUp({
+      content: stripIndentsAndLines`
+        Started recording in <#${channel!.id}>.
 
-    if (dmMessage)
-      await ctx.sendFollowUp({
-        content: `Started recording in <#${channel!.id}>.`,
-        ephemeral: true,
-        components: [
-          {
-            type: ComponentType.ACTION_ROW,
-            components: [
-              {
-                type: ComponentType.BUTTON,
-                style: ButtonStyle.LINK,
-                label: 'Jump to DM',
-                url: `https://discord.com/channels/@me/${dmChannel.id}/${dmMessage.id}`,
-                emoji: this.emojis.getPartial('jump') || undefined
-              }
-            ]
-          }
-        ]
-      });
-    else
-      await ctx.sendFollowUp({
-        content: stripIndentsAndLines`
-          Started recording in <#${channel!.id}>.
-          I was unable to send you a DM with the download link. I need to be able to DM you to send you the download link in the future.
-
-          **Recording ID:** \`${recording.id}\`
-          **Delete key:** ||\`${recording.deleteKey}\`|| (click to show)
-          ${
-            recording.webapp
-              ? `**Webapp URL:** ${this.client.config.craig.webapp.connectUrl.replace('{id}', recording.id).replace('{key}', recording.ennuiKey)}`
-              : ''
-          }
-
-          To bring up the recording link again, use the \`/recordings\` command.
-        `,
-        ephemeral: true,
-        components: [
-          {
-            type: ComponentType.ACTION_ROW,
-            components: [
-              {
-                type: ComponentType.BUTTON,
-                style: ButtonStyle.LINK,
-                label: 'Download',
-                url: `https://${this.client.config.craig.downloadDomain}/rec/${recording.id}?key=${recording.accessKey}`,
-                emoji: this.emojis.getPartial('download') || undefined
-              },
-              {
-                type: ComponentType.BUTTON,
-                style: ButtonStyle.LINK,
-                label: 'Delete recording',
-                url: `https://${this.client.config.craig.downloadDomain}/rec/${recording.id}?key=${recording.accessKey}&delete=${recording.deleteKey}`,
-                emoji: this.emojis.getPartial('delete') || undefined
-              }
-            ]
-          }
-        ]
-      });
+        **Recording ID:** \`${recording.id}\`
+        To bring up the recording links later, use the \`/recordings\` command.
+      `,
+      ephemeral: true
+    });
   }
 }

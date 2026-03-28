@@ -1,0 +1,88 @@
+{
+    "_local_name": "Español",
+    "craig_rec": "Grabación de Craig",
+    "loading": "Cargando…",
+    "downloading": "Descargando…",
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "delete": "Borrar",
+    "reveal": "Revelar",
+    "info": {
+        "users": "Usuarios",
+        "channel": "Canal",
+        "server": "Servidor",
+        "req_by": "Solicitado por",
+        "duration": "Duración",
+        "started": "Comenzó en",
+        "expires": "La grabación expira en {{expire}}.",
+        "delete_rec": "Eliminar grabación",
+        "rec_id": "ID de Grabación",
+        "behalf": "en nombre de"
+    },
+    "sections": {
+        "dl": "Descargas",
+        "avatars": "Avatares",
+        "other_formats": "Otros formatos",
+        "mt": "Multi-pista",
+        "st": "Mezcla en una pista",
+        "stsm": "Mezcla en una pista (Mezcla inteligente)",
+        "mt_other": "Multi-pista (otros formatos)",
+        "local": "Procesamiento local",
+        "misc": "Variado",
+        "glowers": "Superposiciones de Avatares"
+    },
+    "download": {
+        "audacity": "Proyecto de Audacity",
+        "other": "Otros",
+        "win": "Aplicación de Windows",
+        "mac": "Aplicación de Mac OS X",
+        "unsup": "(archivo no compatible)",
+        "info": "Información"
+    },
+    "footer": {
+        "build": "Revisión",
+        "showing_hidden": "(mostrando oculto)"
+    },
+    "glowers": {
+        "format": "Formato",
+        "download": "Descargar",
+        "transparent_bg": "Fondo transparente",
+        "bg_color": "Color de fondo",
+        "fg_color": "Color del resplandor",
+        "format_desc": {
+            "webmvp8": "WebM soporta transparencia, pero la mayoría de los editores de video no soportan WebM."
+        }
+    },
+    "ms": {
+        "ms_one": "{{count}} milisegundo",
+        "ms_other": "{{count}} milisegundos",
+        "s_one": "{{count}} segundo",
+        "s_other": "{{count}} segundos",
+        "m_one": "{{count}} minuto",
+        "m_other": "{{count}} minutos",
+        "h_one": "{{count}} hora",
+        "h_other": "{{count}} horas",
+        "d_one": "{{count}} día",
+        "d_other": "{{count}} días",
+        "y_one": "{{count}} año",
+        "y_other": "{{count}} años"
+    },
+    "modal": {
+        "error": "Ocurrió un error.",
+        "delete_rec": "¿Eliminar grabación?",
+        "download_fail": "¡Descarga fracasó!"
+    },
+    "modal_content": {
+        "ennuizel_dont_show": "No vuelvas a mostrar esto",
+        "ennuizel_confirm": "Entiendo.",
+        "download_processing": "Descargar comenzando a procesar…"
+    },
+    "error": {
+        "unknown": "Un error desconocido ocurrió.",
+        "1101": "Formato inválido.",
+        "1001": "Identificación invalida.",
+        "1003": "Grabación no encontrada.",
+        "1004": "Se eliminó la grabación."
+    },
+    "processing": "Procesando…"
+}

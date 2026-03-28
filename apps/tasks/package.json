@@ -5,13 +5,14 @@
   "exports": "./dist/index.js",
   "private": true,
   "author": {
-    "name": "Snazzah",
-    "email": "me@snazzah.com",
-    "url": "https://snazzah.com/"
+    "name": "Shreyas Goyal",
+    "email": "xenshreyas@gmail.com",
+    "url": "https://github.com/xenshreyas"
   },
   "scripts": {
     "start": "dotenv -e ../../.env -c -- node dist/index.js",
     "build": "rimraf dist && tsc",
+    "test": "node --import tsx --test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prisma:generate": "prisma generate --schema=../../prisma/schema.prisma",
@@ -31,6 +32,7 @@
     "dropbox": "^10.34.0",
     "googleapis": "^104.0.0",
     "lodash.isequal": "^4.5.0",
+    "stripe": "^21.0.1",
     "winston": "^3.11.0",
     "zod": "^3.19.1"
   },

@@ -1,7 +1,7 @@
 # Self-hosting/installation
 Craig can be installed and ran locally. Some use cases for this are:
-- Contributing to Craig's source code
-- Creating multiple instances of Craig
+- Contributing to this capstone-maintained fork
+- Creating multiple instances of the bot
 
 ## Pre-requisites/dependencies
 Craig can only be ran on a Linux machine. The installation has been tested on a fresh install of **Ubuntu 22.04** and **Kubuntu 23.10**, as well as Docker.
@@ -14,6 +14,8 @@ wget make inkscape ffmpeg flac fdkaac vorbis-tools opus-tools zip unzip lsb-rele
 
 
 ## 1. Clone source code
+
+This capstone copy is a modified fork of the public Craig project. If you are working from the original upstream instead of this repository copy, use the upstream repository URL.
 
 ```
 git clone --recurse-submodules https://github.com/CraigChat/craig.git

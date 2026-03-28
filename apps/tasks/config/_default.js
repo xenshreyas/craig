@@ -80,9 +80,25 @@ module.exports = {
     queueKey: 'summary:queue',
     lockTtlS: 14400,
     popTimeoutS: 5,
-    model: process.env.OPENAI_SUMMARY_MODEL || 'gpt-5-mini',
+    model: process.env.OPENAI_SUMMARY_MODEL || 'gpt-5.4-mini',
     previewChars: process.env.SUMMARY_PREVIEW_CHARS ? Number(process.env.SUMMARY_PREVIEW_CHARS) : 1200,
     workerConcurrency: process.env.SUMMARY_WORKER_CONCURRENCY ? Number(process.env.SUMMARY_WORKER_CONCURRENCY) : 1,
     maxTranscriptChars: process.env.SUMMARY_MAX_TRANSCRIPT_CHARS ? Number(process.env.SUMMARY_MAX_TRANSCRIPT_CHARS) : 120000
+  },
+
+  aiBudget: {
+    monthlyCapUsd: process.env.AI_BUDGET_MONTHLY_CAP_USD ? Number(process.env.AI_BUDGET_MONTHLY_CAP_USD) : 15,
+    transcriptCostPerMinuteUsd: process.env.AI_BUDGET_TRANSCRIPT_COST_PER_MINUTE_USD
+      ? Number(process.env.AI_BUDGET_TRANSCRIPT_COST_PER_MINUTE_USD)
+      : 0.006,
+    summaryInputCostPer1MTokensUsd: process.env.AI_BUDGET_SUMMARY_INPUT_COST_PER_1M_TOKENS_USD
+      ? Number(process.env.AI_BUDGET_SUMMARY_INPUT_COST_PER_1M_TOKENS_USD)
+      : 0.75,
+    summaryCachedInputCostPer1MTokensUsd: process.env.AI_BUDGET_SUMMARY_CACHED_INPUT_COST_PER_1M_TOKENS_USD
+      ? Number(process.env.AI_BUDGET_SUMMARY_CACHED_INPUT_COST_PER_1M_TOKENS_USD)
+      : 0.075,
+    summaryOutputCostPer1MTokensUsd: process.env.AI_BUDGET_SUMMARY_OUTPUT_COST_PER_1M_TOKENS_USD
+      ? Number(process.env.AI_BUDGET_SUMMARY_OUTPUT_COST_PER_1M_TOKENS_USD)
+      : 4.5
   }
 };

@@ -1,0 +1,60 @@
+{
+    "onboarding": {
+        "noAudio": {
+            "title": "Mikrofonunu kullanamıyorum!"
+        },
+        "requesting": "İzin verilmesi bekleniyor…",
+        "errors": {
+            "badServer": "Geçersiz sunucu.",
+            "badNick": "Geçersiz kullanıcı adı."
+        },
+        "record": "Kayıt",
+        "nickPlaceholder": "Kullanıcı Adı",
+        "nickLabel": "Sana ne olarak seslenmeliyim?",
+        "joining": "Katılınıyor",
+        "join": "Katıl"
+    },
+    "modal": {
+        "errors": {
+            "RECORDING_ENDED": "Kayıt sonlandı."
+        },
+        "reload": "Yeniden Yükle",
+        "reason": "Sebep",
+        "disconnected": "Bağlantı kesildi."
+    },
+    "rec": {
+        "noUsersConnected": "Bağlı kullanıcı yok…",
+        "microphone": "Mikrofon",
+        "disconnect": "Bağlantıyı Kes",
+        "unmute": "Susturmayı Kaldır",
+        "mute": "Sustur"
+    },
+    "in": "'na, serverindeki",
+    "login": {
+        "errors": {
+            "noKey": "Web Uygulaması kodu sağlanamadı.",
+            "noID": "Kayıt ID'si sağlanamadı.",
+            "invalidKey": "Web Uygulaması kodu bu kayıt için geçersiz.",
+            "notFound": "Kayıt bulunamadı. Kaydın Web Uygulamasında gözükme izni verdiğinden emin ol."
+        },
+        "tos": "Kullanım Şartları",
+        "privacy": "Güvenlik Politikası",
+        "server": "Sunucu",
+        "home": "Ana Sayfa",
+        "what": "Bu nedir?",
+        "webKey": "Web Uygulaması Kodu",
+        "recId": "Kayıt ID'si",
+        "connect": "Bağla"
+    },
+    "options": {
+        "nr": {
+            "title": "Gürültü Azaltma"
+        }
+    },
+    "server": {
+        "custom": "Özel"
+    },
+    "back": "Geri",
+    "craigWebapp": "Craig Web Sürümü",
+    "_local_name": "Türkçe"
+}
