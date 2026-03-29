@@ -65,7 +65,7 @@ export function LandingFooter() {
             <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-4">Links</h4>
             <ul className="space-y-2.5">
               {[
-                { label: 'GitHub', href: 'https://github.com/CraigChat/craig' },
+                { label: 'Support Server', href: 'https://discord.gg/h8ksR9uqg3' },
                 { label: 'Privacy Policy', href: '/privacy' },
               ].map(({ label, href }) => (
                 <li key={label}>

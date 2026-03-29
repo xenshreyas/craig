@@ -51,7 +51,7 @@ export default class Join extends GeneralCommand {
               type: ComponentType.BUTTON,
               style: ButtonStyle.LINK,
               label: 'Support Server',
-              url: 'https://discord.gg/tKmzsdB7'
+              url: 'https://discord.gg/h8ksR9uqg3'
             }
           ]
         }
@@ -82,7 +82,7 @@ export default class Join extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'Join Support Server',
-                url: 'https://discord.gg/tKmzsdB7'
+                url: 'https://discord.gg/h8ksR9uqg3'
               }
             ]
           }
@@ -322,7 +322,7 @@ export default class Join extends GeneralCommand {
                   type: ComponentType.BUTTON,
                   style: ButtonStyle.LINK,
                   label: 'Join Support Server',
-                  url: 'https://discord.gg/tKmzsdB7'
+                  url: 'https://discord.gg/h8ksR9uqg3'
                 }
               ]
             }
@@ -347,36 +347,6 @@ export default class Join extends GeneralCommand {
     const blessing = await this.prisma.blessing.findFirst({ where: { guildId: guild.id } });
     const blessingUser = blessing ? await this.prisma.user.findFirst({ where: { id: blessing.userId } }) : null;
     const parsedRewards = parseRewards(this.recorder.client.config, userData?.rewardTier ?? 0, blessingUser?.rewardTier ?? 0);
-
-    // Check if user can record
-    if (parsedRewards.rewards.recordHours <= 0)
-      return {
-        content: stripIndentsAndLines`
-          Sorry, but this bot is only for patrons. Please use Silhouette.
-          If you have recently became a patron, login to the [dashboard](${this.client.config.craig.dashboardURL}/).
-          Your benefits may take up to an hour to become active.
-        `,
-        components: [
-          {
-            type: ComponentType.ACTION_ROW,
-            components: [
-              {
-                type: ComponentType.BUTTON,
-                style: ButtonStyle.LINK,
-                label: 'Silhouette',
-                url: this.client.config.craig.homepage
-              },
-              {
-                type: ComponentType.BUTTON,
-                style: ButtonStyle.LINK,
-                label: 'Patreon',
-                url: 'https://patreon.com/CraigRec'
-              }
-            ]
-          }
-        ],
-        ephemeral: true
-      };
 
     // Nickname the bot
     const selfUser = await getSelfMember(guild, this.client.bot);

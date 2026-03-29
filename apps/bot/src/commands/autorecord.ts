@@ -99,7 +99,7 @@ export default class AutoRecord extends GeneralCommand {
                 type: ComponentType.BUTTON,
                 style: ButtonStyle.LINK,
                 label: 'Join Support Server',
-                url: 'https://discord.gg/tKmzsdB7'
+                url: 'https://discord.gg/h8ksR9uqg3'
               }
             ]
           }
@@ -215,25 +215,11 @@ export default class AutoRecord extends GeneralCommand {
         if (!parsedRewards.rewards.features.includes('auto'))
           return {
             content: stripIndents`
-              Sorry, but this feature is only for Tier 2 supporters ($4 patrons).
-              If you have recently became a supporter, login to the [dashboard](${this.client.config.craig.dashboardURL}/).
-              Your benefits may take up to an hour to become active.
+              This feature is still a work in progress and is not generally available yet.
+              It will be released based on demand once it is ready.
 
               > **Note:** You can still record regularly with the \`/join\` command.
             `,
-            components: [
-              {
-                type: ComponentType.ACTION_ROW,
-                components: [
-                  {
-                    type: ComponentType.BUTTON,
-                    style: ButtonStyle.LINK,
-                    label: 'Patreon',
-                    url: 'https://patreon.com/CraigRec'
-                  }
-                ]
-              }
-            ],
             ephemeral: true
           };
 
