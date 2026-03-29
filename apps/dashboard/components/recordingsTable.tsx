@@ -88,7 +88,7 @@ function ExternalLinkIcon() {
 
 export default function RecordingsTable({ rows, downloadBaseUri, guildId, returnTo, requesters = {} }: RecordingsTableProps) {
   return (
-    <div className="w-full overflow-hidden rounded-md bg-zinc-600/70 ring-1 ring-white/5 shadow-md">
+    <div className="w-full overflow-hidden rounded-lg bg-zinc-900/40 border border-zinc-700/50 shadow-md">
       <table className="w-full border-collapse text-left">
         <thead className="bg-black/20">
           <tr>
@@ -101,7 +101,7 @@ export default function RecordingsTable({ rows, downloadBaseUri, guildId, return
             <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-zinc-400">Link</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-500/40">
+        <tbody className="divide-y divide-zinc-700/50">
           {rows.length === 0 ? (
             <tr>
               <td className="px-4 py-8 text-sm text-zinc-400" colSpan={7}>

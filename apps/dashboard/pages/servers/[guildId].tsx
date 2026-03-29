@@ -61,10 +61,10 @@ export default function ServerDashboard({
       <Head>
         <title>{guild.name} • Silhouette Dashboard</title>
       </Head>
-      <div className="min-h-screen bg-gradient-to-t from-neutral-800 to-zinc-900 text-white font-body flex items-center justify-center flex-col py-12 sm:px-12">
-        <div className="bg-zinc-700 sm:rounded-lg flex justify-center items-center sm:shadow-lg w-full flex-col sm:w-4/5 sm:max-w-5xl">
+      <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-neutral-900 text-white font-body flex items-center justify-center flex-col py-12 sm:px-12">
+        <div className="bg-zinc-800/60 border border-zinc-700/50 sm:rounded-xl flex justify-center items-center sm:shadow-lg w-full flex-col sm:w-4/5 sm:max-w-5xl">
           {/* Header */}
-          <div className="flex w-full items-center justify-between gap-4 bg-black/20 p-4 sm:rounded-t-lg">
+          <div className="flex w-full items-center justify-between gap-4 bg-black/30 border-b border-zinc-700/50 p-4 sm:rounded-t-xl">
             <div className="flex items-center gap-3">
               {guild.iconUrl ? (
                 <img src={guild.iconUrl} alt="" className="h-12 w-12 rounded-full bg-zinc-800 object-cover flex-shrink-0" />
@@ -78,7 +78,7 @@ export default function ServerDashboard({
                 <p className="text-sm text-zinc-400">{formatUsdFromMicros(spentMicros)} spent in this server this month</p>
               </div>
             </div>
-            <a href="/" className="flex-shrink-0 rounded-md bg-zinc-600 px-4 py-2 text-sm font-medium hover:bg-zinc-500 transition-colors">
+            <a href="/" className="flex-shrink-0 rounded-md bg-zinc-700/80 border border-zinc-600/50 px-4 py-2 text-sm font-medium hover:bg-zinc-700 transition-colors">
               Back
             </a>
           </div>

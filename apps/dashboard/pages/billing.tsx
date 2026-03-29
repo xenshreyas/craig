@@ -64,8 +64,8 @@ export default function BillingPage(props: Props) {
       <Head>
         <title>Billing • Silhouette Dashboard</title>
       </Head>
-      <div className="min-h-screen bg-gradient-to-t from-neutral-800 to-zinc-900 px-4 py-12 text-white sm:px-12">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 rounded-lg bg-zinc-700 p-6 shadow-lg">
+      <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-neutral-900 px-4 py-12 text-white sm:px-12">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 rounded-xl bg-zinc-800/60 border border-zinc-700/50 p-6 shadow-lg">
           {/* Header */}
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -84,7 +84,7 @@ export default function BillingPage(props: Props) {
               </div>
               <p className="mt-1 text-sm text-zinc-400">Account-scoped AI usage across all linked servers.</p>
             </div>
-            <a href="/" className="flex-shrink-0 rounded-md bg-zinc-600 px-4 py-2 text-sm font-medium hover:bg-zinc-500 transition-colors">
+            <a href="/" className="flex-shrink-0 rounded-md bg-zinc-700/80 border border-zinc-600/50 px-4 py-2 text-sm font-medium hover:bg-zinc-700 transition-colors">
               Back
             </a>
           </div>
@@ -141,7 +141,7 @@ export default function BillingPage(props: Props) {
 
           {/* Billing Status */}
           <Section title="Billing Status" big>
-            <div className="w-full rounded-md bg-zinc-600/70 ring-1 ring-white/5 shadow-md overflow-hidden">
+            <div className="w-full rounded-md bg-zinc-900/40 border border-zinc-700/50 shadow-md overflow-hidden">
               <div className="px-4 py-4 flex flex-col gap-2.5">
                 <div className="flex items-center gap-2.5">
                   <span className="text-sm text-zinc-400 w-36 flex-shrink-0">Status</span>
@@ -158,7 +158,7 @@ export default function BillingPage(props: Props) {
                   <span className="text-sm text-zinc-200">${props.aiBillingMonthlyCapUsd}</span>
                 </div>
               </div>
-              <div className="border-t border-zinc-500/40 px-4 py-4">
+              <div className="border-t border-zinc-700/50 px-4 py-4">
                 <div className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400">Stripe Setup</div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <form method="post" action="/api/billing/checkout" className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -171,7 +171,7 @@ export default function BillingPage(props: Props) {
                         name="promotionCode"
                         type="text"
                         placeholder="Optional"
-                        className="rounded-md bg-zinc-800 px-3 py-2 text-sm text-white outline-none ring-1 ring-zinc-500 focus:ring-teal-400 transition-shadow"
+                        className="rounded-md bg-zinc-900/60 border border-zinc-600/50 px-3 py-2 text-sm text-white outline-none focus:border-teal-500/70 transition-colors"
                       />
                     </div>
                     <button
@@ -185,7 +185,7 @@ export default function BillingPage(props: Props) {
                     <form method="post" action="/api/billing/portal">
                       <button
                         type="submit"
-                        className="rounded-md bg-zinc-500 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-400 transition-colors"
+                        className="rounded-md bg-zinc-700/80 border border-zinc-600/50 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
                       >
                         Manage Billing
                       </button>
@@ -212,7 +212,7 @@ export default function BillingPage(props: Props) {
                     max={50}
                     step={1}
                     defaultValue={props.aiBillingMonthlyCapUsd}
-                    className="w-28 rounded-md bg-zinc-800 px-3 py-2 text-sm text-white outline-none ring-1 ring-zinc-500 focus:ring-teal-400 transition-shadow"
+                    className="w-28 rounded-md bg-zinc-900/60 border border-zinc-600/50 px-3 py-2 text-sm text-white outline-none focus:border-teal-500/70 transition-colors"
                   />
                   <button
                     type="submit"
