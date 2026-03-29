@@ -84,7 +84,7 @@ export default function BillingPage(props: Props) {
               </div>
               <p className="mt-1 text-sm text-zinc-400">Account-scoped AI usage across all linked servers.</p>
             </div>
-            <a href="/" className="flex-shrink-0 rounded-md bg-zinc-700/80 border border-zinc-600/50 px-4 py-2 text-sm font-medium hover:bg-zinc-700 transition-colors">
+            <a href="/dashboard" className="flex-shrink-0 rounded-md bg-zinc-700/80 border border-zinc-600/50 px-4 py-2 text-sm font-medium hover:bg-zinc-700 transition-colors">
               Back
             </a>
           </div>

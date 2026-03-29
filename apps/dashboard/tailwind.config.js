@@ -3,7 +3,7 @@ const sans = defaults.theme.fontFamily.sans;
 const mono = defaults.theme.fontFamily.mono;
 
 module.exports = {
-  content: ['./pages/**/*.{js,ts,jsx,tsx}', './components/**/*.{js,ts,jsx,tsx}'],
+  content: ['./pages/**/*.{js,ts,jsx,tsx}', './components/**/*.{js,ts,jsx,tsx}', './lib/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {

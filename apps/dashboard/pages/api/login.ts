@@ -19,12 +19,12 @@ const OAUTH_QS = new URLSearchParams({
 const OAUTH_URI = `https://discord.com/api/oauth2/authorize?${OAUTH_QS}`;
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
-  if (req.method !== 'GET') return res.redirect('/');
+  if (req.method !== 'GET') return res.redirect('/dashboard');
 
   const { code = null, error = null } = req.query;
-  const next = typeof req.query.next === 'string' ? req.query.next : '/';
+  const next = typeof req.query.next === 'string' ? req.query.next : '/dashboard';
 
-  if (error) return res.redirect(`/?error=${req.query.error}&from=discord`);
+  if (error) return res.redirect(`/dashboard?error=${req.query.error}&from=discord`);
 
   if (!code || typeof code !== 'string') return res.redirect(OAUTH_URI);
 
