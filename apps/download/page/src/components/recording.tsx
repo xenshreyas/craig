@@ -1,20 +1,16 @@
 import { Icon } from '@iconify/react';
-import avatarsIcon from '@iconify-icons/ic/baseline-burst-mode';
 import downloadIcon from '@iconify-icons/ic/baseline-download';
 import expiryIcon from '@iconify-icons/ic/outline-timer';
-import audioIcon from '@iconify-icons/ic/round-audio-file';
-import imageIcon from '@iconify-icons/ic/round-image';
 import clsx from 'clsx';
 import { Fragment, h } from 'preact';
 import { useTranslation } from 'react-i18next';
 
 import { CookAvatarsPayload, ReadyState, RecordingNote, RecordingPageInfo, RecordingUser, SummaryState, TranscriptState } from '../api';
 import prettyMs from '../prettyMs';
-import { getDownloadsSection, getOtherFormatsSection, SectionButton } from '../sections';
+import { getDownloadsSection, SectionButton } from '../sections';
 import { asT, PlatformInfo } from '../util';
 import DiscordElement from './discordElement';
 import DownloadButton from './downloadButton';
-import GlowersSection from './glowersSection';
 import PreviouslyDownloaded from './previouslyDownloaded';
 import Section from './section';
 
@@ -42,6 +38,47 @@ interface RecordingProps {
   onDeleteClick?(e: MouseEvent): any;
 }
 
+function renderMarkdown(text: string) {
+  const lines = text.split('\n');
+  const elements: any[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul class="list-none space-y-1 my-1">
+          {listItems.map((item, i) => (
+            <li key={i} class="flex gap-2">
+              <span class="text-teal-500 flex-shrink-0">–</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      flushList();
+      elements.push(<h3 class="font-semibold text-white mt-3 mb-1 text-base">{line.slice(3)}</h3>);
+    } else if (line.startsWith('# ')) {
+      flushList();
+      elements.push(<h2 class="font-bold text-white text-lg mt-4 mb-1">{line.slice(2)}</h2>);
+    } else if (line.startsWith('- ') || line.startsWith('\u2013 ')) {
+      listItems.push(line.slice(2));
+    } else if (line.trim() === '') {
+      flushList();
+    } else {
+      flushList();
+      elements.push(<p class="text-zinc-300">{line}</p>);
+    }
+  }
+  flushList();
+  return elements;
+}
+
 export default function Recording({ state, onDurationClick, onDownloadClick, onDeleteClick, onAvatarsClick }: RecordingProps) {
   const { t } = useTranslation();
   const recording = state.recording;
@@ -49,25 +86,20 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
   const expiryDate = new Date(startDate.valueOf() + 1000 * 60 * 60 * (recording.expiresAfter || 24));
   const expiryTime = expiryDate.valueOf() - Date.now();
   const downloadsSection = getDownloadsSection(recording, state.platform);
-  const othersSection = getOtherFormatsSection(recording, state.platform);
   const transcript = state.transcriptState;
   const summary = state.summaryState;
 
   return (
     <Fragment>
       {/* Info Box */}
-      <div class="flex flex-col gap-4 bg-zinc-700 shadow-md p-4 rounded-lg text-sm text-zinc-200">
-        <div>
-          <span class="text-zinc-100 font-display">{t('info.rec_id')}:</span> <span class="font-mono">{state.recordingId}</span>
-        </div>
-
-        <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-4 bg-zinc-800/60 border border-zinc-700/50 shadow-md p-5 rounded-xl text-sm text-zinc-200">
+        <div class="flex flex-col gap-2">
           <div class="flex items-center gap-1 flex-wrap">
-            <span class="text-zinc-100 font-display">{t('info.req_by')}:</span>
+            <span class="text-zinc-400 font-display">{t('info.req_by')}:</span>
             {recording.requesterExtra ? <DiscordElement {...recording.requesterExtra} id={recording.requesterId} /> : recording.requester}
             {recording.user ? (
               <Fragment>
-                <span class="text-zinc-400 font-medium">{t('info.behalf')}</span>
+                <span class="text-zinc-500 font-medium">{t('info.behalf')}</span>
                 {recording.userExtra ? <DiscordElement {...recording.userExtra} id={recording.userId} /> : recording.user}
               </Fragment>
             ) : (
@@ -75,53 +107,58 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
             )}
           </div>
           <div class="flex items-center gap-1 flex-wrap">
-            <span class="text-zinc-100 font-display">{t('info.server')}:</span>
+            <span class="text-zinc-400 font-display">{t('info.server')}:</span>
             {recording.guildExtra ? <DiscordElement {...recording.guildExtra} /> : recording.guild}
           </div>
           <div class="flex items-center gap-1 flex-wrap">
-            <span class="text-zinc-100 font-display">{t('info.channel')}:</span>
+            <span class="text-zinc-400 font-display">{t('info.channel')}:</span>
             {recording.channelExtra ? <DiscordElement {...recording.channelExtra} elementType="channel" /> : recording.channel}
           </div>
           <div>
-            <span class="text-zinc-100 font-display">{t('info.started')}:</span> {startDate.toLocaleString()}
+            <span class="text-zinc-400 font-display">{t('info.started')}:</span>{' '}
+            <span class="text-zinc-200">{startDate.toLocaleString()}</span>
           </div>
         </div>
 
-        <div class="flex flex-col gap-1">
+        <div class="flex flex-col gap-1 pt-1 border-t border-zinc-700/50">
           <div>
-            <span class="text-zinc-100 font-display">{t('info.duration')}:</span>{' '}
+            <span class="text-zinc-400 font-display">{t('info.duration')}:</span>{' '}
             {state.durationLoading ? (
-              <span class="font-medium text-zinc-400">{t('loading')}</span>
+              <span class="font-medium text-zinc-500">{t('loading')}</span>
             ) : recording.audioExpired && state.duration === null ? (
-              <span class="font-medium text-zinc-400">Unavailable</span>
+              <span class="font-medium text-zinc-500">Unavailable</span>
             ) : state.duration === null ? (
-              <button onClick={onDurationClick} class="font-medium text-zinc-400 hover:underline focus:underline outline-none">
+              <button onClick={onDurationClick} class="font-medium text-teal-400 hover:underline focus:underline outline-none">
                 {t('reveal')}
               </button>
             ) : (
-              <span>{prettyMs(state.duration * 1000)}</span>
+              <span class="text-zinc-200">{prettyMs(state.duration * 1000)}</span>
             )}
           </div>
           <div class="flex items-center gap-1 flex-wrap">
-            <span class="text-zinc-100 font-display">{t('info.users')}:</span>
+            <span class="text-zinc-400 font-display">{t('info.users')}:</span>
             {state.users.map((user) => (
               <DiscordElement {...user} key={user.id} />
             ))}
           </div>
         </div>
-	      </div>
 
-	      {recording.audioExpired ? (
-	        <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-amber-200">
-	          {state.expiredAudioMessage || 'The audio for this recording has expired and is no longer available.'}
-	        </div>
-	      ) : (
-	        ''
-	      )}
+        <div class="text-xs text-zinc-600 font-mono pt-1 border-t border-zinc-700/50">
+          {t('info.rec_id')}: {state.recordingId}
+        </div>
+      </div>
 
-	      {!state.downloading && state.readyState && state.showPreviousDownload && state.readyState.download ? (
-	        <PreviouslyDownloaded readyState={state.readyState} users={state.users} recording={state.recording} platform={state.platform} />
-	      ) : (
+      {recording.audioExpired ? (
+        <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-amber-200">
+          {state.expiredAudioMessage || 'The audio for this recording has expired and is no longer available.'}
+        </div>
+      ) : (
+        ''
+      )}
+
+      {!state.downloading && state.readyState && state.showPreviousDownload && state.readyState.download ? (
+        <PreviouslyDownloaded readyState={state.readyState} users={state.users} recording={state.recording} platform={state.platform} />
+      ) : (
         ''
       )}
 
@@ -140,24 +177,24 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
         ) : (
           ''
         )}
-        <button onClick={onDeleteClick} class="text-zinc-400 font-medium hover:text-red-500 focus:text-red-500 outline-none active:underline">
+        <button onClick={onDeleteClick} class="text-zinc-500 font-medium hover:text-red-400 focus:text-red-400 outline-none active:underline">
           {t('info.delete_rec')}
         </button>
       </div>
 
-      {/* Downloads */}
-	      <Section title="Transcript" icon={downloadIcon}>
-	        {recording.audioExpired ? <span class="text-zinc-300">Audio expired, but the transcript remains available.</span> : ''}
-	        {!transcript || transcript.status === 'PENDING' || transcript.status === 'PROCESSING' ? (
-	          <span class="text-zinc-300">Transcription in progress...</span>
-	        ) : transcript.status === 'COMPLETE' ? (
+      {/* Transcript */}
+      <Section title="Transcript" icon={downloadIcon}>
+        {recording.audioExpired ? <span class="text-zinc-300">Audio expired, but the transcript remains available.</span> : ''}
+        {!transcript || transcript.status === 'PENDING' || transcript.status === 'PROCESSING' ? (
+          <span class="text-zinc-400">Transcription in progress...</span>
+        ) : transcript.status === 'COMPLETE' ? (
           <div class="flex flex-col gap-3 w-full">
-            <div class="bg-zinc-800 rounded-lg p-3 text-zinc-200 whitespace-pre-wrap break-words max-h-56 overflow-y-auto">
+            <div class="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-4 text-zinc-300 whitespace-pre-wrap break-words max-h-56 overflow-y-auto text-sm">
               {transcript.preview || 'Transcript generated with no text.'}
             </div>
             <a
               href={`/api/recording/${state.recordingId}/transcript.txt?key=${recording.key}`}
-              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 focus:bg-cyan-500/10 outline-none"
+              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-zinc-600/60 bg-zinc-800/50 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-700/60 hover:text-white transition-colors outline-none"
             >
               Download TXT
             </a>
@@ -167,114 +204,75 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
             Transcript unavailable.
             {transcript.errorMessage ? ` ${transcript.errorMessage}` : ''}
           </span>
-	        )}
-	      </Section>
+        )}
+      </Section>
 
-	      <Section title="Meeting Summary" icon={downloadIcon}>
-	        {!summary || summary.status === 'PENDING' || summary.status === 'PROCESSING' ? (
-	          <span class="text-zinc-300">Summary generation in progress...</span>
-	        ) : summary.status === 'COMPLETE' ? (
-	          <div class="flex flex-col gap-3 w-full">
-	            <div class="bg-zinc-800 rounded-lg p-3 text-zinc-200 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
-	              {summary.preview || 'Summary generated with no text.'}
-	            </div>
-	            <a
-	              href={`/api/recording/${state.recordingId}/summary.md?key=${recording.key}`}
-	              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 focus:bg-cyan-500/10 outline-none"
-	            >
-	              Download MD
-	            </a>
-	          </div>
-	        ) : (
-	          <span class="text-red-400">
-	            Summary unavailable.
-	            {summary.errorMessage ? ` ${summary.errorMessage}` : ''}
-	          </span>
-	        )}
-	      </Section>
+      {/* Meeting Summary */}
+      <Section title="Meeting Summary" icon={downloadIcon}>
+        {!summary || summary.status === 'PENDING' || summary.status === 'PROCESSING' ? (
+          <span class="text-zinc-400">Summary generation in progress...</span>
+        ) : summary.status === 'COMPLETE' ? (
+          <div class="flex flex-col gap-3 w-full">
+            <div class="bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-4 py-3 text-zinc-300 break-words max-h-96 overflow-y-auto text-sm space-y-1">
+              {summary.preview ? renderMarkdown(summary.preview) : <span class="text-zinc-500">Summary generated with no text.</span>}
+            </div>
+            <a
+              href={`/api/recording/${state.recordingId}/summary.md?key=${recording.key}`}
+              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-zinc-600/60 bg-zinc-800/50 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-700/60 hover:text-white transition-colors outline-none"
+            >
+              Download MD
+            </a>
+          </div>
+        ) : (
+          <span class="text-red-400">
+            Summary unavailable.
+            {summary.errorMessage ? ` ${summary.errorMessage}` : ''}
+          </span>
+        )}
+      </Section>
 
-	      {state.notes && state.notes.length > 0 ? (
-	        <Section title="Notes" icon={downloadIcon}>
-	          <div class="flex flex-col gap-2 w-full">
-	            {state.notes.map((note, index) => (
-	              <div key={index} class="bg-zinc-800 rounded-lg p-3 text-zinc-200">
-	                <div class="text-xs uppercase tracking-wide text-zinc-400">{prettyMs(Number(note.time) * 1000)}</div>
-	                <div>{note.note}</div>
-	              </div>
-	            ))}
-	          </div>
-	        </Section>
-	      ) : (
-	        ''
-	      )}
+      {state.notes && state.notes.length > 0 ? (
+        <Section title="Notes" icon={downloadIcon}>
+          <div class="flex flex-col gap-2 w-full">
+            {state.notes.map((note, index) => (
+              <div key={index} class="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-3 text-zinc-200">
+                <div class="text-xs uppercase tracking-wide text-zinc-500 mb-1">{prettyMs(Number(note.time) * 1000)}</div>
+                <div>{note.note}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      ) : (
+        ''
+      )}
 
-	      {/* Downloads */}
-	      {!recording.audioExpired ? (
-	        <Section title={t('sections.dl')} icon={downloadIcon}>
-	          {downloadsSection.map((section, i) => (
-	            <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
-	              <div class="flex flex-row flex-wrap gap-3">
-	                {section.buttons.map((button, ii) =>
-	                  button.hidden ? (
-	                    ''
-	                  ) : (
-	                    <DownloadButton
-	                      icon={button.icon}
-	                      title={asT(t, button.text)}
-	                      suffix={asT(t, button.suffix)}
-	                      ennuizel={button.ennuizel !== undefined}
-	                      key={ii}
-	                      onClick={(e) => onDownloadClick(button, e)}
-	                    />
-	                  )
-	                )}
-	              </div>
-	            </Section>
-	          ))}
-	        </Section>
-	      ) : (
-	        ''
-	      )}
-
-	      {/* Avatars */}
-	      {!recording.audioExpired ? (
-	        <Section title={t('sections.avatars')} icon={avatarsIcon} collapsable collapsed>
-	          <div class="flex flex-row flex-wrap gap-3">
-	            <DownloadButton icon={imageIcon} onClick={(e) => onAvatarsClick({}, e)} title="PNG" />
-	          </div>
-	          {recording.features.glowers ? <GlowersSection platform={state.platform} users={state.users} onDownload={onAvatarsClick} /> : ''}
-	        </Section>
-	      ) : (
-	        ''
-	      )}
-
-	      {/* Other Formats */}
-	      {!recording.audioExpired ? (
-	        <Section title={t('sections.other_formats')} icon={audioIcon} collapsable collapsed>
-	          {othersSection.map((section, i) => (
-	            <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
-	              <div class="flex flex-row flex-wrap gap-3">
-	                {section.buttons.map((button, ii) =>
-	                  button.hidden ? (
-	                    ''
-	                  ) : (
-	                    <DownloadButton
-	                      icon={button.icon}
-	                      title={asT(t, button.text)}
-	                      suffix={asT(t, button.suffix)}
-	                      ennuizel={button.ennuizel !== undefined}
-	                      key={ii}
-	                      onClick={(e) => onDownloadClick(button, e)}
-	                    />
-	                  )
-	                )}
-	              </div>
-	            </Section>
-	          ))}
-	        </Section>
-	      ) : (
-	        ''
-	      )}
-	    </Fragment>
-	  );
-	}
+      {/* Downloads */}
+      {!recording.audioExpired ? (
+        <Section title={t('sections.dl')} icon={downloadIcon}>
+          {downloadsSection.map((section, i) => (
+            <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
+              <div class="flex flex-row flex-wrap gap-3">
+                {section.buttons.map((button, ii) =>
+                  button.hidden ? (
+                    ''
+                  ) : (
+                    <DownloadButton
+                      icon={button.icon}
+                      title={asT(t, button.text)}
+                      suffix={asT(t, button.suffix)}
+                      ennuizel={button.ennuizel !== undefined}
+                      key={ii}
+                      onClick={(e) => onDownloadClick(button, e)}
+                    />
+                  )
+                )}
+              </div>
+            </Section>
+          ))}
+        </Section>
+      ) : (
+        ''
+      )}
+    </Fragment>
+  );
+}

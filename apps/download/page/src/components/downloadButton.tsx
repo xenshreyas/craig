@@ -15,13 +15,10 @@ export default function DownloadButton({ icon, title, suffix, ennuizel, onClick 
     <button
       class={clsx(
         'inline-flex flex-row text-sm sm:text-base sm:py-2 py-1 sm:px-4 px-2 sm:gap-2 gap-1',
-        'items-center justify-center w-fit sm:min-w-button min-w-button-sm font-medium border-2 bg-opacity-25 rounded-md',
-        'hover:text-white hover:bg-opacity-100 transition-colors',
-        'focus:text-white focus:bg-opacity-100 active:border-white outline-none',
-        {
-          'border-teal-400 bg-teal-400 text-teal-400': !ennuizel,
-          'border-red-500 bg-red-500 text-red-500': ennuizel
-        }
+        'items-center justify-center w-fit sm:min-w-button min-w-button-sm font-medium rounded-md',
+        'border border-zinc-600/60 bg-zinc-800/50 text-zinc-300',
+        'hover:border-zinc-500 hover:bg-zinc-700/60 hover:text-white transition-colors',
+        'focus:border-zinc-500 focus:text-white outline-none'
       )}
       onClick={onClick}
     >
