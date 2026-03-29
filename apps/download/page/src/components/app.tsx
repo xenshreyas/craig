@@ -1,6 +1,4 @@
 import { Icon } from '@iconify/react';
-import showIcon from '@iconify-icons/bi/eye-fill';
-import hideIcon from '@iconify-icons/bi/eye-slash-fill';
 import closeIcon from '@iconify-icons/ic/close';
 import { Component, h } from 'preact';
 import { Translation } from 'react-i18next';
@@ -20,12 +18,11 @@ import {
   SummaryState,
   TranscriptState
 } from '../api';
-import i18n, { languages } from '../i18n';
+import i18n from '../i18n';
 import { SectionButton } from '../sections';
 import { asT, getPlatformInfo, parseError, PlatformInfo, wait } from '../util';
 import DeleteModalContent from './deleteModalContent';
 import DownloadingModalContent from './downloadingModalContent';
-import Dropdown from './dropdown';
 import EnnuizelModalContent from './ennuizelModalContent';
 import Modal from './modal';
 import ModalButton from './modalButton';
@@ -515,11 +512,9 @@ export default class App extends Component<any, AppState> {
   }
 
   render() {
-    const hasRev = process.env.GIT_REVISION && !process.env.GIT_REVISION.startsWith('<');
-
     return (
       <Translation>
-        {(t, { i18n }) => (
+        {(t, { i18n: _i18n }) => (
           <div class="min-h-screen bg-zinc-900 text-white font-body">
             <div class="sm:max-w-4xl mx-auto py-12 sm:px-12 px-4 space-y-10">
               {/* Header */}
@@ -550,54 +545,6 @@ export default class App extends Component<any, AppState> {
                 />
               )}
 
-              {/* Footer */}
-              <div class="flex justify-between">
-                <div class="flex flex-col">
-                  {hasRev ? (
-                    <span class="opacity-50 text-xs font-mono">
-                      {t('footer.build')} {process.env.GIT_REVISION.slice(0, 7)}
-                    </span>
-                  ) : (
-                    ''
-                  )}
-                  <div class="flex text-xs gap-1 items-center">
-                    <button
-                      class="cursor-pointer opacity-50 hover:opacity-75 focus:opacity-100 transition-opacity focus:outline-none"
-                      onClick={this.toggleHiddenPlatform}
-                    >
-                      <Icon icon={this.state.platform.showHidden ? hideIcon : showIcon} />
-                    </button>
-                    <span class="opacity-50">
-                      {[
-                        this.state.platform.windows ? 'Windows' : '',
-                        this.state.platform.macosx ? 'Mac OS X' : '',
-                        this.state.platform.android ? 'Android' : '',
-                        this.state.platform.iphone ? 'iPhone' : '',
-                        this.state.platform.unix ? 'Unix' : ''
-                      ]
-                        .filter((p) => !!p)
-                        .join(', ')}
-                      {this.state.platform.showHidden ? ` ${t('footer.showing_hidden')}` : ''}
-                    </span>
-                  </div>
-                </div>
-                <div class="flex flex-col flex-none">
-                  {languages.length > 1 ? (
-                    <Dropdown
-                      right
-                      bottom
-                      items={languages}
-                      selected={languages.find((l) => l.value === i18n.language)}
-                      onSelect={(lang) => {
-                        localStorage.setItem('i18nextLng', lang.value);
-                        i18n.changeLanguage(lang.value);
-                      }}
-                    />
-                  ) : (
-                    ''
-                  )}
-                </div>
-              </div>
             </div>
             <Modal open={this.state.modalOpen} label={this.state.modalContentLabel} onClose={() => this.closeModal()}>
               {this.state.downloading ? (

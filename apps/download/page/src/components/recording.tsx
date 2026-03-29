@@ -183,21 +183,20 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
       </div>
 
       {/* Transcript */}
-      <Section title="Transcript" icon={downloadIcon}>
+      <Section title="Transcript">
         {recording.audioExpired ? <span class="text-zinc-300">Audio expired, but the transcript remains available.</span> : ''}
         {!transcript || transcript.status === 'PENDING' || transcript.status === 'PROCESSING' ? (
           <span class="text-zinc-400">Transcription in progress...</span>
         ) : transcript.status === 'COMPLETE' ? (
-          <div class="flex flex-col gap-3 w-full">
-            <div class="bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-4 text-zinc-300 whitespace-pre-wrap break-words max-h-56 overflow-y-auto text-sm">
-              {transcript.preview || 'Transcript generated with no text.'}
-            </div>
+          <div class="relative bg-zinc-800/60 border border-zinc-700/50 rounded-lg p-4 pr-10 text-zinc-300 whitespace-pre-wrap break-words max-h-56 overflow-y-auto text-sm">
             <a
               href={`/api/recording/${state.recordingId}/transcript.txt?key=${recording.key}`}
-              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-zinc-600/60 bg-zinc-800/50 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-700/60 hover:text-white transition-colors outline-none"
+              class="absolute top-2 right-2 text-zinc-500 hover:text-zinc-200 transition-colors outline-none"
+              title="Download TXT"
             >
-              Download TXT
+              <Icon icon={downloadIcon} className="w-5 h-5" />
             </a>
+            {transcript.preview || 'Transcript generated with no text.'}
           </div>
         ) : (
           <span class="text-red-400">
@@ -208,20 +207,19 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
       </Section>
 
       {/* Meeting Summary */}
-      <Section title="Meeting Summary" icon={downloadIcon}>
+      <Section title="Meeting Summary">
         {!summary || summary.status === 'PENDING' || summary.status === 'PROCESSING' ? (
           <span class="text-zinc-400">Summary generation in progress...</span>
         ) : summary.status === 'COMPLETE' ? (
-          <div class="flex flex-col gap-3 w-full">
-            <div class="bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-4 py-3 text-zinc-300 break-words max-h-96 overflow-y-auto text-sm space-y-1">
-              {summary.preview ? renderMarkdown(summary.preview) : <span class="text-zinc-500">Summary generated with no text.</span>}
-            </div>
+          <div class="relative bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-4 pt-3 pb-3 pr-10 text-zinc-300 break-words max-h-96 overflow-y-auto text-sm space-y-1">
             <a
               href={`/api/recording/${state.recordingId}/summary.md?key=${recording.key}`}
-              class="inline-flex max-w-fit rounded-md px-4 py-2 text-sm font-medium border border-zinc-600/60 bg-zinc-800/50 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-700/60 hover:text-white transition-colors outline-none"
+              class="absolute top-2 right-2 text-zinc-500 hover:text-zinc-200 transition-colors outline-none"
+              title="Download MD"
             >
-              Download MD
+              <Icon icon={downloadIcon} className="w-5 h-5" />
             </a>
+            {summary.preview ? renderMarkdown(summary.preview) : <span class="text-zinc-500">Summary generated with no text.</span>}
           </div>
         ) : (
           <span class="text-red-400">
@@ -248,7 +246,7 @@ export default function Recording({ state, onDurationClick, onDownloadClick, onD
 
       {/* Downloads */}
       {!recording.audioExpired ? (
-        <Section title={t('sections.dl')} icon={downloadIcon}>
+        <Section title="Audio Recording" icon={downloadIcon}>
           {downloadsSection.map((section, i) => (
             <Section title={asT(t, section.title)} icon={section.icon} small key={i}>
               <div class="flex flex-row flex-wrap gap-3">
