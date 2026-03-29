@@ -1,27 +1,12 @@
-import type { Patreon } from '@prisma/client';
 import clsx from 'clsx';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 
 import BillingBanner from '../components/billingBanner';
-import BudgetCard from '../components/budgetCard';
 import Button from '../components/button';
-import DropboxButton from '../components/dropboxButton';
-import Dropdown, { DropdownItem } from '../components/dropdown';
-import GoogleButton from '../components/googleButton';
 import GuildCard from '../components/guildCard';
-import Link from '../components/link';
-import MicrosoftButton from '../components/microsoftButton';
 import { Modal } from '../components/modal';
-import Row from '../components/row';
-import Section from '../components/section';
-import SelectableRow from '../components/selectableRow';
-import DropboxLogo from '../components/svg/dropbox';
-import GoogleDriveLogo from '../components/svg/googleDrive';
-import OneDriveLogo from '../components/svg/oneDrive';
-import PatreonLogo from '../components/svg/patreon';
-import Toggle from '../components/toggle';
 import prisma from '../lib/prisma';
 import { getAvatarUrl, formatUsdFromCents, formatUsdFromMicros, getGuildIconUrl, parseUser } from '../utils';
 import { getAccountTrialTotalMicros } from '../utils/budget';
@@ -29,30 +14,15 @@ import { DiscordUser } from '../utils/types';
 
 interface Props {
   user: DiscordUser;
-  rewardTier: number | null;
-  patronId: string | null;
-  patron: Patreon | null;
-  drive: DriveProps;
-  googleDrive: boolean;
-  microsoft: boolean;
-  dropbox: boolean;
   linkedGuilds: LinkedGuild[];
   lifetimeUsageMicros: number;
   currentMonthUsageMicros: number;
   currentMonthBilledCents: number;
-  trialRemainingMicros: number;
   trialTotalMicros: number;
   aiBillingMonthlyCapUsd: number;
   trialExhausted: boolean;
   hasStripeSetup: boolean;
   hasBillingOverride: boolean;
-}
-
-interface DriveProps {
-  enabled: boolean;
-  service: string;
-  format: string;
-  container: string;
 }
 
 interface LinkedGuild {
@@ -62,106 +32,19 @@ interface LinkedGuild {
   spentMicros: number;
 }
 
-const tierNames: { [key: number]: string } = {
-  [-1]: 'Greater Weasel',
-  0: 'Default',
-  10: 'Supporter',
-  20: 'Better Supporter',
-  30: 'FLAC Demander',
-  100: 'MP3 God'
-};
-
-const formats: DropdownItem[] = [
-  {
-    title: 'Audacity Project',
-    value: 'flac-aupzip'
-  },
-  {
-    title: 'FLAC',
-    value: 'flac-zip'
-  },
-  {
-    title: 'AAC',
-    value: 'aac-zip'
-  },
-  {
-    title: 'FLAC Single-Track Mix',
-    suffix: '($4 Tier)',
-    value: 'flac-mix',
-    tierRequired: 20
-  },
-  {
-    title: 'AAC Single-Track Mix',
-    suffix: '($4 Tier)',
-    value: 'aac-mix',
-    tierRequired: 20
-  },
-  {
-    title: 'Ogg Vorbis Single-Track Mix',
-    suffix: '($4 Tier)',
-    value: 'vorbis-mix',
-    tierRequired: 20
-  },
-  {
-    title: 'Ogg FLAC',
-    value: 'oggflac-zip'
-  },
-  {
-    title: 'HE-AAC',
-    value: 'heaac-zip'
-  },
-  {
-    title: 'Opus',
-    value: 'opus-zip'
-  },
-  {
-    title: 'Ogg Vorbis',
-    value: 'vorbis-zip'
-  },
-  {
-    title: 'ADPCM wav',
-    value: 'adpcm-zip'
-  },
-  {
-    title: '8-bit wav',
-    value: 'wav8-zip'
-  }
-];
-
-const serviceNames: { [key: string]: string } = {
-  google: 'Google Drive',
-  dropbox: 'Dropbox',
-  onedrive: 'OneDrive',
-  box: 'Box'
-};
-
 export default function Index(props: Props) {
   const [modalParsed, setModalParsed] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('Modal');
-  const [modalContent, setModalContent] = useState('');
+  const [modalContent, setModalContent] = useState<any>('');
 
-  const [patronUnlinkOpen, setPatronUnlinkOpen] = useState(false);
+  const trialSpentMicros = Math.min(props.lifetimeUsageMicros, props.trialTotalMicros);
+  const trialUsagePct = Math.min(100, props.trialTotalMicros > 0 ? (trialSpentMicros / props.trialTotalMicros) * 100 : 0);
+  const trialRemainingMicros = Math.max(0, props.trialTotalMicros - trialSpentMicros);
+  const currentUsageLabel = props.hasStripeSetup
+    ? formatUsdFromCents(props.currentMonthBilledCents)
+    : formatUsdFromMicros(props.currentMonthUsageMicros);
 
-  const [loading, setLoading] = useState(false);
-  const [drive, setDrive] = useState(props.drive);
-  const [driveEnabled, setDriveEnabled] = useState(props.drive.enabled ?? false);
-  const [driveFormat, setDriveFormat] = useState(
-    formats.find((f) => f.value === `${props.drive.format || 'flac'}-${props.drive.container || 'zip'}`) ?? formats[0]
-  );
-  const [driveService, setDriveService] = useState(props.drive.service ?? 'google');
-
-  const driveCanEnable =
-    (driveService === 'google' && props.googleDrive) ||
-    (driveService === 'onedrive' && props.microsoft) ||
-    (driveService === 'dropbox' && props.dropbox);
-
-  const benefitDate = new Date(Date.now() + 1000 * 60 * 60);
-  benefitDate.setMinutes(0);
-  benefitDate.setSeconds(0);
-  benefitDate.setMilliseconds(0);
-
-  // Use modal
   useEffect(() => {
     if (modalParsed) return;
 
@@ -170,53 +53,15 @@ export default function Index(props: Props) {
     if (p.get('error')) {
       const error = p.get('error');
       const from = p.get('from');
-      // titlecase from
-      if (from === 'google') title = 'An error occurred while connecting to Google.';
-      else if (from === 'patreon') title = 'An error occurred while connecting to Patreon.';
-      else if (from === 'discord') title = 'An error occurred while connecting to Discord.';
-      else if (from === 'microsoft') title = 'An error occurred while connecting to Microsoft.';
-      else if (from === 'dropbox') title = 'An error occurred while connecting to Dropbox.';
+      if (from === 'discord') title = 'An error occurred while connecting to Discord.';
       else title = 'An error occurred.';
 
       if (error === 'access_denied') content = 'You denied access to your account.';
-      else if (error === 'invalid_scope')
-        content = 'You have provided partial permissions to Silhouette. Cloud backup will not work unless all permissions are checked.';
       else content = error;
     }
 
     const r = p.get('r');
-    if (r === 'patreon_linked') {
-      title = 'Patreon linked!';
-      content = 'You have successfully linked your Patreon account. It may take up to an hour for your tier to update.';
-    } else if (r === 'patreon_unlinked') {
-      title = 'Patreon unlinked.';
-      content = 'You have successfully unlinked your Patreon account.';
-    } else if (r === 'google_linked') {
-      title = 'Google Drive linked!';
-      content = 'You have successfully linked your Google Drive account.';
-    } else if (r === 'microsoft_linked') {
-      title = 'Microsoft OneDrive linked!';
-      content = 'You have successfully linked your Microsoft account.';
-    } else if (r === 'google_unlinked') {
-      title = 'Google Drive unlinked.';
-      content = 'You have successfully unlinked your Google Drive account.';
-    } else if (r === 'microsoft_unlinked') {
-      title = 'Microsoft OneDrive unlinked.';
-      content = (
-        <span>
-          You have unlinked your Microsoft account, but you can revoke app permissions in your{' '}
-          <Link href="https://microsoft.com/consent">Microsoft settings</Link>.
-        </span>
-      );
-    } else if (r === 'dropbox_unlinked') {
-      title = 'Dropbox unlinked.';
-      content = (
-        <span>
-          You have unlinked your Dropbox account, but you can revoke app permissions in your{' '}
-          <Link href="https://www.dropbox.com/account/connected_apps">Dropbox settings</Link>.
-        </span>
-      );
-    } else if (r === 'server_linked') {
+    if (r === 'server_linked') {
       title = 'Server linked!';
       content = 'Your server is now linked to your Silhouette dashboard.';
     } else if (r === 'publish_started') {
@@ -231,55 +76,6 @@ export default function Index(props: Props) {
     }
     setModalParsed(true);
   });
-
-  // Drive state update
-  useEffect(() => {
-    if (!drive) return;
-    const [format, container] = driveFormat.value.split('-');
-    if (drive.enabled === driveEnabled && format === drive.format && container === drive.container && drive.service === driveService) return;
-    setLoading(true);
-    fetch(`/api/user/drive`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        enabled: driveEnabled,
-        format: format ?? 'flac',
-        container: container ?? 'zip',
-        service: driveService ?? 'google'
-      })
-    })
-      .then(async (res) => {
-        if (res.status === 200) {
-          setDrive({
-            ...drive,
-            enabled: driveEnabled,
-            format: format ?? 'flac',
-            container: container ?? 'zip',
-            service: driveService
-          });
-          setLoading(false);
-        } else {
-          const data = await res.json().catch(() => ({}));
-          setLoading(false);
-          setModalTitle('An error occurred.');
-          setModalContent(`An error occurred while updating your drive settings.${data.error ? `\n${data.error}` : ''}`);
-          setModalOpen(true);
-
-          // Reset settings
-          setDriveEnabled(drive.enabled);
-          setDriveFormat(formats.find((f) => f.value === `${drive.format}-${drive.container}`) ?? formats[0]);
-          setDriveService(drive.service);
-        }
-      })
-      .catch((e) => {
-        setLoading(false);
-        setModalTitle('An error occurred.');
-        setModalContent(`An error occurred while updating your drive settings.\n${e.message}`);
-        setModalOpen(true);
-      });
-  }, [driveEnabled, driveFormat, driveService, drive]);
 
   return (
     <>
@@ -300,51 +96,98 @@ export default function Index(props: Props) {
         <meta name="msapplication-TileColor" content="#2dd4bf" />
         <meta name="theme-color" content="#2dd4bf" />
       </Head>
-      <div className="min-h-screen bg-gradient-to-t from-neutral-800 to-zinc-900 text-white font-body flex items-center justify-center flex-col py-12 sm:px-12">
-        <div className="bg-zinc-700 sm:rounded flex justify-center items-center sm:shadow-md w-full flex-col sm:w-4/5 sm:max-w-4xl">
-          <h1 className="text-3xl flex justify-center p-3 gap-4 items-center relative bg-black bg-opacity-20 w-full font-body">
-            <img src={getAvatarUrl(props.user)} className="w-12 h-12 rounded-full" />
-            <span>
-              Hello, <span className="font-medium">{props.user.username}</span>
-              {!!props.user.discriminator && props.user.discriminator !== '0' ? <span className="opacity-50">#{props.user.discriminator}</span> : ''}
-            </span>
-          </h1>
-          <div className="flex flex-col justify-center items-center p-6 gap-4 w-full">
-            <Section title="Your Servers" big>
-              {props.trialExhausted && !props.hasStripeSetup && !props.hasBillingOverride ? <BillingBanner /> : null}
-              <BudgetCard
-                title="Trial Credits"
-                spentMicros={Math.min(props.lifetimeUsageMicros, props.trialTotalMicros)}
-                capMicros={props.trialTotalMicros}
-              />
-              <div className="w-full rounded-md bg-zinc-600 px-4 py-4 text-sm text-zinc-200 shadow-md">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-1">
-                    <div>
-                      Current month account usage:{' '}
-                      {props.hasStripeSetup ? formatUsdFromCents(props.currentMonthBilledCents) : formatUsdFromMicros(props.currentMonthUsageMicros)}
-                    </div>
-                    <div>Future monthly hard cap: ${props.aiBillingMonthlyCapUsd}</div>
-                  </div>
-                  <a
-                    href="/billing"
-                    className="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 font-medium text-white transition-colors hover:bg-teal-500"
-                  >
-                    Open Billing
-                  </a>
+
+      <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-neutral-900 text-white font-body flex items-start justify-center px-4 py-12 sm:px-8">
+        <div className="w-full max-w-2xl flex flex-col gap-3">
+
+          {/* Header */}
+          <div className="flex items-center justify-between gap-4 rounded-xl bg-zinc-800/60 border border-zinc-700/50 px-5 py-4 shadow-lg">
+            <div className="flex items-center gap-3">
+              <img src={getAvatarUrl(props.user)} className="w-11 h-11 rounded-full ring-2 ring-teal-500/40" />
+              <div>
+                <div className="text-xs text-zinc-500 font-medium uppercase tracking-widest">Dashboard</div>
+                <div className="text-lg font-semibold text-white leading-tight">
+                  Hello, {props.user.username}
+                  {!!props.user.discriminator && props.user.discriminator !== '0' ? (
+                    <span className="text-zinc-400 font-normal text-base">#{props.user.discriminator}</span>
+                  ) : ''}
                 </div>
               </div>
-              <div className="flex w-full items-center justify-between gap-4">
-                <span className="text-sm text-zinc-300">
-                  Linked servers: <span className="font-medium text-white">{props.linkedGuilds.length}</span>
-                </span>
-                <Button type="brand" onClick={() => (location.href = '/api/install/start')}>
-                  Add Server
-                </Button>
+            </div>
+            <button
+              onClick={() => (location.href = '/api/logout')}
+              className="text-sm text-zinc-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-700/60"
+            >
+              Logout
+            </button>
+          </div>
+
+          {/* Trial exhausted banner */}
+          {props.trialExhausted && !props.hasStripeSetup && !props.hasBillingOverride ? <BillingBanner /> : null}
+
+          {/* Billing Card */}
+          <div className="rounded-xl bg-zinc-800/60 border border-zinc-700/50 px-5 py-4 shadow-lg">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <div className="text-xs text-zinc-500 font-medium uppercase tracking-widest mb-0.5">Billing</div>
+                <div className="text-base font-semibold text-white">Trial Credits</div>
               </div>
+              <a
+                href="/billing"
+                className="text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors mt-0.5"
+              >
+                Manage →
+              </a>
+            </div>
+
+            <div className="h-1.5 w-full rounded-full bg-zinc-700 mb-2">
+              <div
+                className={clsx('h-1.5 rounded-full transition-all', {
+                  'bg-teal-500': trialUsagePct < 80,
+                  'bg-amber-500': trialUsagePct >= 80 && trialUsagePct < 100,
+                  'bg-red-500': trialUsagePct >= 100
+                })}
+                style={{ width: `${trialUsagePct}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-zinc-400 mb-3">
+              <span>{formatUsdFromMicros(trialSpentMicros)} of {formatUsdFromMicros(props.trialTotalMicros)} used</span>
+              <span>{formatUsdFromMicros(trialRemainingMicros)} remaining</span>
+            </div>
+
+            <div className="flex items-center justify-between text-sm border-t border-zinc-700/50 pt-3">
+              <span className="text-zinc-400">
+                This month: <span className="text-white font-medium">{currentUsageLabel}</span>
+              </span>
+              <span className="text-zinc-400">
+                Monthly cap: <span className="text-white font-medium">${props.aiBillingMonthlyCapUsd}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Servers Card */}
+          <div className="rounded-xl bg-zinc-800/60 border border-zinc-700/50 shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-700/50">
+              <div>
+                <div className="text-xs text-zinc-500 font-medium uppercase tracking-widest mb-0.5">Servers</div>
+                <div className="text-base font-semibold text-white">
+                  {props.linkedGuilds.length} linked {props.linkedGuilds.length === 1 ? 'server' : 'servers'}
+                </div>
+              </div>
+              <button
+                onClick={() => (location.href = '/api/install/start')}
+                className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-teal-500"
+              >
+                + Add Server
+              </button>
+            </div>
+
+            <div className="divide-y divide-zinc-700/50">
               {props.linkedGuilds.length === 0 ? (
-                <div className="w-full rounded-md bg-zinc-600 px-4 py-4 text-zinc-300 shadow-md">
-                  No servers linked yet. Use Add Server to install Silhouette and claim ownership in the dashboard.
+                <div className="px-5 py-8 text-center text-sm text-zinc-500">
+                  No servers linked yet.{' '}
+                  <span className="text-teal-400">Add Server</span>{' '}
+                  to install Silhouette and claim ownership in the dashboard.
                 </div>
               ) : (
                 props.linkedGuilds.map((guild) => (
@@ -357,150 +200,12 @@ export default function Index(props: Props) {
                   />
                 ))
               )}
-            </Section>
-            <div className="flex justify-center items-center gap-2 text-xl font-display">
-              <span className="font-medium">Current Tier:</span>
-              <span
-                className={clsx({
-                  'text-amber-500 font-medium': props.rewardTier === -1,
-                  'opacity-50': props.rewardTier === 0,
-                  'text-teal-500 font-medium': props.rewardTier > 0
-                })}
-              >
-                {tierNames[props.rewardTier] ?? `#${props.rewardTier}`}
-              </span>
             </div>
-            <Row title="Patreon" icon={<PatreonLogo className="w-8 h-8 rounded-full" />}>
-              {props.patronId ? (
-                <Button type="transparent" className="text-red-500" onClick={() => setPatronUnlinkOpen(true)}>
-                  Disconnect
-                </Button>
-              ) : (
-                <Button type="brand" onClick={() => (location.href = '/api/patreon/oauth')}>
-                  Connect
-                </Button>
-              )}
-            </Row>
-            <Section title="Cloud Backup" big>
-              {props.rewardTier === 0 ? (
-                <div className="flex flex-col w-full">
-                  <span>To enable cloud backup to services like Google Drive, you must be a patron.</span>
-                  <Link href="https://patreon.com/CraigRec">Become a patron</Link> <br />
-                  <h2 className="font-display text-lg">Have you recently became a patron?</h2>
-                  <ul className="list-disc list-inside">
-                    <li>
-                      Benefits are checked at the start of every hour, so you should get your benefits at{' '}
-                      <time dateTime={benefitDate.toISOString()} className="bg-white/20 px-1 rounded-md">
-                        {typeof Intl !== 'undefined'
-                          ? Intl.DateTimeFormat('en-US', { hour: 'numeric', timeZoneName: 'short' }).format(benefitDate)
-                          : benefitDate.toLocaleString()}
-                      </time>{' '}
-                      (your time zone).
-                    </li>
-                    <li>
-                      If you linked your Discord through Patreon itself <b>when you started to become a patron</b>, it should give you benefits
-                      automatically.
-                    </li>
-                    <li>
-                      Make sure you are logging in with <b>the same Discord account you record with</b> and connecting to{' '}
-                      <b>the same Patreon account you are a patron with</b>.
-                    </li>
-                    <li>
-                      <i>Still</i> didn't get your benefits? Join the <Link href="https://discord.gg/tKmzsdB7">support server</Link> for help.
-                    </li>
-                  </ul>
-                </div>
-              ) : (
-                <>
-                  <Toggle
-                    label={`Upload Recordings to ${serviceNames[driveService] || 'Drive'}`}
-                    description="Note: After your recording has finished, the recording will not be able to be downloaded while the recording is still uploading."
-                    tooltip={!driveCanEnable ? 'You must link a service to your account to enable cloud backups.' : undefined}
-                    className="w-full"
-                    disabled={!driveCanEnable || loading}
-                    checked={driveEnabled}
-                    onToggle={setDriveEnabled}
-                  />
-                  <SelectableRow
-                    title="Google Drive"
-                    icon={<GoogleDriveLogo className="w-8 h-8" />}
-                    selected={drive.service === 'google'}
-                    disabled={loading}
-                    hidden={!props.googleDrive}
-                    onClick={() => setDriveService('google')}
-                  >
-                    {props.googleDrive ? (
-                      <Button type="transparent" className="text-red-500" onClick={() => (location.href = '/api/google/disconnect')}>
-                        Disconnect
-                      </Button>
-                    ) : (
-                      <GoogleButton onClick={() => (location.href = '/api/google/oauth')} />
-                    )}
-                  </SelectableRow>
-                  <SelectableRow
-                    title="Microsoft OneDrive"
-                    icon={<OneDriveLogo className="w-8 h-8" />}
-                    selected={drive.service === 'onedrive'}
-                    disabled={loading}
-                    hidden={!props.microsoft}
-                    onClick={() => setDriveService('onedrive')}
-                  >
-                    {props.microsoft ? (
-                      <Button type="transparent" className="text-red-500" onClick={() => (location.href = '/api/microsoft/disconnect')}>
-                        Disconnect
-                      </Button>
-                    ) : (
-                      <MicrosoftButton onClick={() => (location.href = '/api/microsoft/oauth')} />
-                    )}
-                  </SelectableRow>
-                  <SelectableRow
-                    title="Dropbox"
-                    icon={<DropboxLogo className="w-8 h-8" />}
-                    selected={drive.service === 'dropbox'}
-                    disabled={loading}
-                    hidden={!props.dropbox}
-                    onClick={() => setDriveService('dropbox')}
-                  >
-                    {props.dropbox ? (
-                      <Button type="transparent" className="text-red-500" onClick={() => (location.href = '/api/dropbox/disconnect')}>
-                        Disconnect
-                      </Button>
-                    ) : (
-                      <DropboxButton onClick={() => (location.href = '/api/dropbox/oauth')} />
-                    )}
-                  </SelectableRow>
-                  <Dropdown
-                    disabled={loading}
-                    items={formats}
-                    label="Format"
-                    className={'w-full'}
-                    full
-                    selected={driveFormat}
-                    onSelect={setDriveFormat}
-                    tier={props.rewardTier}
-                  />
-                </>
-              )}
-            </Section>
-            <Button type="danger" onClick={() => (location.href = '/api/logout')}>
-              Logout
-            </Button>
           </div>
+
         </div>
       </div>
-      <Modal open={patronUnlinkOpen} title="Are you sure you want to unlink your Patreon account?" setOpen={setPatronUnlinkOpen}>
-        <div className="flex flex-col gap-2">
-          <span>Your benefits will be revoked if you unlink your Patreon.</span>
-          <div className="flex gap-2 items-center">
-            <Button type="brand" onClick={() => (location.href = '/api/patreon/disconnect')} className="w-fit">
-              Unlink
-            </Button>
-            <Button onClick={() => setPatronUnlinkOpen(false)} className="w-fit">
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+
       <Modal open={modalOpen} title={modalTitle} setOpen={setModalOpen}>
         <div className="flex flex-col gap-2">
           <span>{modalContent}</span>
@@ -521,7 +226,7 @@ export default function Index(props: Props) {
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async function (ctx) {
-  const { getAccountTrialRemainingMicros, getBillingStatus, getCurrentMonthAccountUsageMicros, getGuildUsageSummaries, getLifetimeAccountUsageMicros } =
+  const { getBillingStatus, getCurrentMonthAccountUsageMicros, getGuildUsageSummaries, getLifetimeAccountUsageMicros, getAccountTrialRemainingMicros } =
     await import('../utils/budgetData');
   const user = parseUser(ctx.req);
 
@@ -534,10 +239,6 @@ export const getServerSideProps: GetServerSideProps<Props> = async function (ctx
     };
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-  const patron = dbUser && dbUser.patronId ? await prisma.patreon.findUnique({ where: { id: dbUser.patronId } }) : null;
-  const googleDrive = await prisma.googleDriveUser.findUnique({ where: { id: user.id } });
-  const microsoft = await prisma.microsoftUser.findUnique({ where: { id: user.id } });
-  const dropbox = await prisma.dropboxUser.findUnique({ where: { id: user.id } });
   const linkedGuilds = await prisma.guild.findMany({
     where: { ownerUserId: user.id },
     orderBy: { linkedAt: 'desc' }
@@ -551,22 +252,9 @@ export const getServerSideProps: GetServerSideProps<Props> = async function (ctx
   return {
     props: {
       user,
-      rewardTier: dbUser?.rewardTier || 0,
-      patronId: dbUser?.patronId || null,
-      patron,
-      drive: {
-        enabled: dbUser?.driveEnabled || false,
-        service: dbUser?.driveService || 'google',
-        format: dbUser?.driveFormat || 'flac',
-        container: dbUser?.driveContainer || 'zip'
-      },
-      googleDrive: !!googleDrive,
-      microsoft: !!microsoft,
-      dropbox: !!dropbox,
       lifetimeUsageMicros,
       currentMonthUsageMicros,
       currentMonthBilledCents: billingStatus.currentMonthBilledCents,
-      trialRemainingMicros,
       trialTotalMicros: getAccountTrialTotalMicros(),
       aiBillingMonthlyCapUsd: dbUser?.aiBillingMonthlyCapUsd ?? 10,
       trialExhausted: trialRemainingMicros <= 0,
