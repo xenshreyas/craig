@@ -12,6 +12,11 @@ import { config } from '../../utils/config';
 import { formatUsdFromMicros, getGuildIconUrl, parseUser } from '../../utils';
 import { getAccountTrialTotalMicros } from '../../utils/budget';
 
+interface RequesterInfo {
+  username: string;
+  avatarUrl: string | null;
+}
+
 interface Props {
   guild: {
     id: string;
@@ -25,6 +30,7 @@ interface Props {
   page: number;
   hasPrev: boolean;
   hasNext: boolean;
+  requesters: Record<string, RequesterInfo>;
   recordings: Array<{
     id: string;
     createdAt: string;
@@ -38,33 +44,47 @@ interface Props {
 
 const PAGE_SIZE = 10;
 
-export default function ServerDashboard({ guild, spentMicros, trialExhausted, hasStripeSetup, hasBillingOverride, page, hasPrev, hasNext, recordings }: Props) {
+export default function ServerDashboard({
+  guild,
+  spentMicros,
+  trialExhausted,
+  hasStripeSetup,
+  hasBillingOverride,
+  page,
+  hasPrev,
+  hasNext,
+  recordings,
+  requesters
+}: Props) {
   return (
     <>
       <Head>
         <title>{guild.name} • Silhouette Dashboard</title>
       </Head>
       <div className="min-h-screen bg-gradient-to-t from-neutral-800 to-zinc-900 text-white font-body flex items-center justify-center flex-col py-12 sm:px-12">
-        <div className="bg-zinc-700 sm:rounded flex justify-center items-center sm:shadow-md w-full flex-col sm:w-4/5 sm:max-w-5xl">
-          <div className="flex w-full items-center justify-between gap-4 bg-black/20 p-4">
+        <div className="bg-zinc-700 sm:rounded-lg flex justify-center items-center sm:shadow-lg w-full flex-col sm:w-4/5 sm:max-w-5xl">
+          {/* Header */}
+          <div className="flex w-full items-center justify-between gap-4 bg-black/20 p-4 sm:rounded-t-lg">
             <div className="flex items-center gap-3">
               {guild.iconUrl ? (
-                <img src={guild.iconUrl} alt="" className="h-12 w-12 rounded-full bg-zinc-800 object-cover" />
+                <img src={guild.iconUrl} alt="" className="h-12 w-12 rounded-full bg-zinc-800 object-cover flex-shrink-0" />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800 font-display text-lg text-zinc-300">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-zinc-800 font-display text-lg text-zinc-300">
                   {guild.name.slice(0, 1).toUpperCase()}
                 </div>
               )}
               <div>
                 <h1 className="font-display text-2xl">{guild.name}</h1>
-                <p className="text-sm text-zinc-300">{formatUsdFromMicros(spentMicros)} spent in this server this month</p>
+                <p className="text-sm text-zinc-400">{formatUsdFromMicros(spentMicros)} spent in this server this month</p>
               </div>
             </div>
-            <a href="/" className="rounded-md bg-zinc-600 px-4 py-2 font-medium hover:bg-zinc-500">
+            <a href="/" className="flex-shrink-0 rounded-md bg-zinc-600 px-4 py-2 text-sm font-medium hover:bg-zinc-500 transition-colors">
               Back
             </a>
           </div>
-          <div className="flex w-full flex-col gap-4 p-6">
+
+          {/* Content */}
+          <div className="flex w-full flex-col gap-5 p-6">
             {trialExhausted && !hasStripeSetup && !hasBillingOverride ? <BillingBanner /> : null}
             <BudgetCard title="Server Usage This Month" spentMicros={spentMicros} capMicros={getAccountTrialTotalMicros()} />
             <Section title="Recent Recordings" big>
@@ -73,6 +93,7 @@ export default function ServerDashboard({ guild, spentMicros, trialExhausted, ha
                 downloadBaseUri={config.downloadBaseUri}
                 guildId={guild.id}
                 returnTo={`/servers/${guild.id}?page=${page}`}
+                requesters={requesters}
               />
               <Pagination
                 page={page}
@@ -86,6 +107,22 @@ export default function ServerDashboard({ guild, spentMicros, trialExhausted, ha
       </div>
     </>
   );
+}
+
+async function fetchDiscordUser(userId: string, botToken: string): Promise<RequesterInfo> {
+  try {
+    const res = await fetch(`https://discord.com/api/v10/users/${userId}`, {
+      headers: { Authorization: `Bot ${botToken}` }
+    });
+    if (!res.ok) return { username: userId, avatarUrl: null };
+    const data = await res.json();
+    return {
+      username: data.global_name || data.username || userId,
+      avatarUrl: data.avatar ? `https://cdn.discordapp.com/avatars/${userId}/${data.avatar}.png?size=32` : null
+    };
+  } catch {
+    return { username: userId, avatarUrl: null };
+  }
 }
 
 export const getServerSideProps: GetServerSideProps<Props> = async function (ctx) {
@@ -125,6 +162,12 @@ export const getServerSideProps: GetServerSideProps<Props> = async function (ctx
   const billingStatus = await getBillingStatus(user.id);
   const pageRows = rows.slice(0, PAGE_SIZE);
 
+  const uniqueUserIds = Array.from(new Set<string>(pageRows.map((r) => r.userId)));
+  const requesterEntries = await Promise.all(
+    uniqueUserIds.map(async (userId) => [userId, await fetchDiscordUser(userId, config.discordBotToken)] as const)
+  );
+  const requesters = Object.fromEntries(requesterEntries);
+
   return {
     props: {
       guild: {
@@ -139,6 +182,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async function (ctx
       page,
       hasPrev: page > 1,
       hasNext: rows.length > PAGE_SIZE,
+      requesters,
       recordings: pageRows.map((row) => ({
         id: row.id,
         createdAt: row.createdAt.toISOString(),
