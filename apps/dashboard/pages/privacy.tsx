@@ -47,7 +47,7 @@ export default function PrivacyPolicy() {
               <ul className="space-y-2 list-none">
                 {[
                   'Audio is sent to OpenAI Whisper for transcription, then deleted from our servers.',
-                  'Transcripts are sent to OpenAI GPT-4 to generate meeting summaries.',
+                  'Transcripts are sent to OpenAI GPT-5.4 to generate meeting summaries.',
                   'Transcripts and summaries are stored and associated with your account so you can review them in the dashboard.',
                   'Usage data is used to calculate billing and enforce your configured monthly cap.',
                   'We do not sell your data to third parties.',
@@ -65,7 +65,7 @@ export default function PrivacyPolicy() {
               <p className="mb-3">Silhouette uses the following third-party services to operate:</p>
               <ul className="space-y-2 list-none">
                 {[
-                  'OpenAI — for transcription (Whisper) and summarization (GPT-4). Audio and transcript text is sent to OpenAI under their API terms.',
+                  'OpenAI — for transcription (Whisper) and summarization (GPT-5.4). Audio and transcript text is sent to OpenAI under their API terms.',
                   'Stripe — for payment processing. Your payment information is handled directly by Stripe and never stored on our servers.',
                   'Discord — for authentication and bot functionality.',
                 ].map((item) => (

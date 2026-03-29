@@ -43,7 +43,7 @@ export function PricingSection() {
               {[
                 'All linked servers',
                 'AI transcription (Whisper)',
-                'Meeting summaries (GPT-4)',
+                'Meeting summaries (GPT-5.4)',
                 'Publish to #silhouette',
                 'Web dashboard access',
                 'Download recordings',

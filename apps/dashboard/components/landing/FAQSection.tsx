@@ -3,7 +3,7 @@ import { useState } from 'react';
 const FAQS: Array<{ q: string; a: string }> = [
   {
     q: 'What is Silhouette?',
-    a: 'Silhouette is a Discord bot that records multi-track audio from voice channels and automatically generates AI-powered transcriptions and meeting summaries using OpenAI Whisper and GPT-4.'
+    a: 'Silhouette is a Discord bot that records multi-track audio from voice channels and automatically generates AI-powered transcriptions and meeting summaries using OpenAI Whisper and GPT-5.4.'
   },
   {
     q: 'How do I add Silhouette to my server?',

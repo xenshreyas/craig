@@ -75,7 +75,7 @@ export function FeaturesSection() {
           <div className="rounded-xl bg-zinc-800/60 border border-zinc-700/50 p-6 hover:border-zinc-600/70 transition-colors">
             <h3 className="text-xl font-semibold text-white mb-2">AI-generated meeting summaries</h3>
             <p className="text-zinc-400 mb-6 text-sm">
-              GPT-4 distills your transcript into key decisions, action items, and takeaways — published automatically to your server.
+              GPT-5.4 distills your transcript into key decisions, action items, and takeaways — published automatically to your server.
             </p>
             <div className="rounded-lg bg-zinc-900/60 border border-zinc-700/50 p-4 text-xs space-y-2.5">
               <div className="text-zinc-300 font-medium">📋 Meeting Summary</div>

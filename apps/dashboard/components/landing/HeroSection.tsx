@@ -12,7 +12,7 @@ export function HeroSection() {
         <div className="flex justify-start mb-6">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-sm text-teal-400">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-            Powered by OpenAI Whisper &amp; GPT-4
+            Powered by OpenAI Whisper &amp; GPT-5.4
           </span>
         </div>
 
