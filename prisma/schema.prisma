@@ -136,7 +136,6 @@ model RecordingTranscript {
   audioBytes   Int?
   text         String?
   preview      String?
-  diarized     Boolean          @default(false)
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
 

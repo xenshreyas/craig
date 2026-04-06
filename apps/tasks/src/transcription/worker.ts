@@ -16,7 +16,6 @@ import { finalizeStripeBillingForRecording } from '../stripeBilling';
 import { enqueueSummary } from '../summary/worker';
 import { OpenAIWhisperProvider } from './openaiWhisperProvider';
 import { TranscriptionProvider } from './provider';
-import { ParticipantMap, readUsersFile, resolveDisplayName } from './participants';
 
 interface TranscriptConfig {
   enabled: boolean;
@@ -152,7 +151,7 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
   const hasLock = await redisClient.set(lockKey, lockToken, 'EX', transcriptConfig.lockTtlS, 'NX');
   if (!hasLock) return;
 
-  let tempDir: string | null = null;
+  let tempAudioPath: string | null = null;
   let tempChunkDir: string | null = null;
   const start = Date.now();
   try {
@@ -198,55 +197,30 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
       }
     });
 
-    tempDir = path.join(tmpdir(), `craig-transcript-${recordingId}-${Date.now()}`);
-    await fsp.mkdir(tempDir, { recursive: true });
-    const tempAudioPath = path.join(tempDir, 'mixed.flac');
-
+    tempAudioPath = path.join(tmpdir(), `craig-transcript-${recordingId}-${Date.now()}.flac`);
+    await buildMixedAudioFile(recordingId, tempAudioPath);
+    const stats = await fsp.stat(tempAudioPath);
     const maxBytes = transcriptConfig.maxFileMb * 1024 * 1024;
     let text = '';
     let usageSeconds = durationSec;
-    let diarized = false;
-    let audioBytes = 0;
-
-    // Attempt per-user diarized path first
-    const participants = await readUsersFile(recordingId);
-    let useMixedPath = participants === null;
-
-    if (!useMixedPath && participants !== null) {
-      const perUserResult = await transcribePerUser(recordingId, participants, provider, transcriptConfig.model, tempDir);
-      if (perUserResult.successCount === 0) {
-        logger.warn('All per-user tracks failed for %s, falling back to mixed path', recordingId);
-        useMixedPath = true;
-      } else {
-        text = assembleDiarizedTranscript(perUserResult.segments);
-        usageSeconds = perUserResult.totalUsageSeconds;
-        diarized = true;
-      }
-    }
-
-    if (useMixedPath) {
-      await buildMixedAudioFile(recordingId, tempAudioPath);
-      const stats = await fsp.stat(tempAudioPath);
-      audioBytes = stats.size;
-      if (stats.size <= maxBytes) {
-        const result = await provider.transcribe(tempAudioPath, transcriptConfig.model);
-        text = result.text;
-        if (typeof result.usageSeconds === 'number') usageSeconds = result.usageSeconds;
-      } else if (!transcriptConfig.chunkEnabled) {
-        await markSkipped(
-          recordingId,
-          'CHUNKING_DISABLED_OVER_LIMIT',
-          `Mixed audio size (${stats.size} bytes) exceeds limit (${maxBytes} bytes) and chunking is disabled.`,
-          durationSec,
-          stats.size
-        );
-        return;
-      } else {
-        const chunkResult = await transcribeWithChunking(recordingId, tempAudioPath, provider, transcriptConfig.model, maxBytes);
-        tempChunkDir = chunkResult.chunkDir;
-        text = chunkResult.text;
-        usageSeconds = chunkResult.usageSeconds;
-      }
+    if (stats.size <= maxBytes) {
+      const result = await provider.transcribe(tempAudioPath, transcriptConfig.model);
+      text = result.text;
+      if (typeof result.usageSeconds === 'number') usageSeconds = result.usageSeconds;
+    } else if (!transcriptConfig.chunkEnabled) {
+      await markSkipped(
+        recordingId,
+        'CHUNKING_DISABLED_OVER_LIMIT',
+        `Mixed audio size (${stats.size} bytes) exceeds limit (${maxBytes} bytes) and chunking is disabled.`,
+        durationSec,
+        stats.size
+      );
+      return;
+    } else {
+      const chunkResult = await transcribeWithChunking(recordingId, tempAudioPath, provider, transcriptConfig.model, maxBytes);
+      tempChunkDir = chunkResult.chunkDir;
+      text = chunkResult.text;
+      usageSeconds = chunkResult.usageSeconds;
     }
 
     await prisma.recordingTranscript.update({
@@ -256,8 +230,7 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
         text,
         preview: text.slice(0, Math.max(1, transcriptConfig.previewChars)),
         durationSec,
-        audioBytes: audioBytes || undefined,
-        diarized,
+        audioBytes: stats.size,
         completedAt: new Date(),
         errorCode: null,
         errorMessage: null
@@ -294,7 +267,7 @@ async function processQueuedRecording(recordingId: string, provider: Transcripti
     });
     logger.error(`Transcript failed for ${recordingId} (${code})`, err);
   } finally {
-    if (tempDir) await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    if (tempAudioPath) await fsp.unlink(tempAudioPath).catch(() => {});
     if (tempChunkDir) await fsp.rm(tempChunkDir, { recursive: true, force: true }).catch(() => {});
     const token = await redisClient.get(lockKey);
     if (token === lockToken) await redisClient.del(lockKey);
@@ -450,72 +423,6 @@ async function buildMixedAudioFile(recordingId: string, outputPath: string) {
   await pipeline(child.stdout, writer);
   const code = await new Promise<number>((resolve) => child.once('close', (exitCode) => resolve(exitCode ?? 0)));
   if (code !== 0) throw new Error(`cook_failed:${stderr.slice(0, 300)}`);
-}
-
-export interface PerUserTranscriptResult {
-  segments: Array<{ displayName: string; text: string }>;
-  totalUsageSeconds: number;
-  successCount: number;
-}
-
-async function buildPerUserAudioFile(recordingId: string, trackNumber: number, outputPath: string): Promise<void> {
-  const cookingPath = path.join(cookPath, '..', 'cook.sh');
-  const child = spawn(cookingPath, [recordingId, 'flac', String(trackNumber)], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const writer = fs.createWriteStream(outputPath, { flags: 'w' });
-  let stderr = '';
-
-  child.stderr.on('data', (buf: Buffer) => {
-    stderr += buf.toString();
-  });
-
-  await pipeline(child.stdout, writer);
-  const code = await new Promise<number>((resolve) => child.once('close', (exitCode) => resolve(exitCode ?? 0)));
-  if (code !== 0) throw new Error(`cook_failed:${stderr.slice(0, 300)}`);
-}
-
-export function assembleDiarizedTranscript(segments: Array<{ displayName: string; text: string }>): string {
-  return segments
-    .filter((seg) => seg.text.trim().length > 0)
-    .map((seg) => `${seg.displayName}: ${seg.text.trim()}`)
-    .join('\n\n');
-}
-
-export async function transcribePerUser(
-  recordingId: string,
-  participants: ParticipantMap,
-  provider: TranscriptionProvider,
-  model: string,
-  tempDir: string
-): Promise<PerUserTranscriptResult> {
-  const segments: Array<{ displayName: string; text: string }> = [];
-  let totalUsageSeconds = 0;
-  let successCount = 0;
-
-  for (const [trackNumber, participantInfo] of participants) {
-    const displayName = resolveDisplayName(participantInfo, trackNumber);
-    const trackPath = path.join(tempDir, `track-${trackNumber}.flac`);
-    try {
-      await buildPerUserAudioFile(recordingId, trackNumber, trackPath);
-
-      const stats = await fsp.stat(trackPath);
-      if (stats.size === 0) {
-        logger.warn('Track %d for recording %s produced empty audio, skipping', trackNumber, recordingId);
-        continue;
-      }
-
-      const result = await provider.transcribe(trackPath, model);
-      const trackDurationSec = stats.size > 0 ? (await getDurationSec(recordingId)) : 0;
-      totalUsageSeconds += result.usageSeconds ?? trackDurationSec;
-      segments.push({ displayName, text: result.text });
-      successCount++;
-    } catch (err) {
-      logger.warn('Failed to process track %d for recording %s: %s', trackNumber, recordingId, (err as Error).message);
-    } finally {
-      await fsp.unlink(trackPath).catch(() => {});
-    }
-  }
-
-  return { segments, totalUsageSeconds, successCount };
 }
 
 async function markSkipped(recordingId: string, errorCode: string, errorMessage: string, durationSec?: number, audioBytes?: number) {
