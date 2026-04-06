@@ -20,7 +20,8 @@ export interface SummaryResult {
 export class OpenAISummaryProvider {
   constructor(private readonly apiKey: string) {}
 
-  async summarize(transcript: string, model: string): Promise<SummaryResult> {
+  async summarize(transcript: string, model: string, systemPrompt?: string): Promise<SummaryResult> {
+    const prompt = systemPrompt ?? SYSTEM_PROMPT;
     const response = await (globalThis as any).fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -32,7 +33,7 @@ export class OpenAISummaryProvider {
         input: [
           {
             role: 'system',
-            content: [{ type: 'input_text', text: SYSTEM_PROMPT }]
+            content: [{ type: 'input_text', text: prompt }]
           },
           {
             role: 'user',

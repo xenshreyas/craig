@@ -11,6 +11,7 @@ import { estimateSummaryCostMicrosFromUsage, getSummaryModelForRecording, record
 import { finalizeStripeBillingForRecording } from '../stripeBilling';
 import { OpenAISummaryProvider } from './openaiSummaryProvider';
 import { enqueueSummaryNotification } from './notifications';
+import { hasSpeakerLabels, DIARIZED_SYSTEM_PROMPT } from './prompt';
 
 interface SummaryConfig {
   enabled: boolean;
@@ -167,7 +168,8 @@ async function processQueuedSummary(recordingId: string, provider: OpenAISummary
     });
 
     const promptInput = truncateTranscript(transcript.text);
-    const result = await provider.summarize(promptInput, summaryModel);
+    const systemPrompt = hasSpeakerLabels(transcript.text) ? DIARIZED_SYSTEM_PROMPT : undefined;
+    const result = await provider.summarize(promptInput, summaryModel, systemPrompt);
     const normalizedMarkdown = result.text.trim();
 
     await prisma.recordingSummary.update({
